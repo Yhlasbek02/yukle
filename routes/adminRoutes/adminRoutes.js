@@ -7,7 +7,7 @@ const transportRoutes = require("./transportRoutes");
 const transportTypeRoutes = require("./transportTypeRoutes");
 const userRoutes = require("./userRoutes");
 const chatRoutes = require("./chatRoutes");
-const notificationRoutes = require("./notificationRoutes");
+
 const checkAdminAuth = require("../../middlewares/adminAuth");
 router.use("/", AuthRoutes);
 router.use("/cargo", checkAdminAuth, cargoRoutes);
@@ -16,5 +16,4 @@ router.use("/transport", checkAdminAuth, transportRoutes);
 router.use("/transport-type", checkAdminAuth, transportTypeRoutes);
 router.use("/users", checkAdminAuth, userRoutes);
 router.use("/chat", checkAdminAuth, chatRoutes);
-router.use("/notification", checkAdminAuth, notificationRoutes);
 module.exports = router;

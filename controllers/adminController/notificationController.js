@@ -34,4 +34,3 @@ class notificationController {
     }
 }
 
-module.exports = notificationController;

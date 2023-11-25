@@ -1,5 +1,14 @@
-const {User, Cargo, CargoType, TransportType, country, city} = require("../../models/models");
+const {User, Cargo, CargoType, TransportType, country, city, Transport} = require("../../models/models");
 const {Op} = require("sequelize");
+
+const admin = require("firebase-admin");
+const serviceAccount = require("../../controllers/adminController/service_account.json");
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+});
+
+const messaging = admin.messaging;
+
 
 class CargoController {
     async getCargoTypes (req, res) {
@@ -70,6 +79,23 @@ class CargoController {
                 whatsApp: whatsApp,
                 userId: userId,
             });
+            const transports = await Transport.findAll({where: {belongsTo: fromCountry}});
+            for (const transport of transports) {
+                const user = await User.findByPk(transport.id);
+                if (user.cargoNotification === true) {
+                    const message = {
+                        notification: {
+                            title: "Title",
+                            body: "body",
+                            image: req.body.imageUrl,
+                        },
+                        token: user.fcm_token
+                    }
+                    await messaging.sendAll(message);
+                }
+            }
+            
+            
             if (lang === "en"){
                 return res.status(200).json({message: "Cargo added successfully", newCargo});
             } if (lang === "ru") {
