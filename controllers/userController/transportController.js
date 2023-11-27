@@ -1,5 +1,6 @@
-const { User, Transport, TransportType, country, city } = require("../../models/models");
+const { User, Transport, TransportType, country, city, Cargo } = require("../../models/models");
 const { Op } = require("sequelize");
+const messaging = require("../adminInitialize");
 
 class transportController {
     async getTransportTypes(req, res) {
@@ -66,6 +67,7 @@ class transportController {
                 name,
                 userId: userId
             });
+
             if (lang === "en"){
                 return res.status(200).json({ message: "Transport added successfully", newTransport });
             } if (lang === "ru") {
