@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/config");
 const { v4: uuidv4 } = require("uuid");
-const {Sequelize} = require("sequelize");
+const { Sequelize } = require("sequelize");
 
 const Admin = sequelize.define('Admin', {
     id: {
@@ -76,10 +76,14 @@ const User = sequelize.define("User", {
     cargoNotification: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
+    },
+    paid: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
     }
-    }, {
-        timestamps: true
-    }
+}, {
+    timestamps: true
+}
 );
 
 const Cargo = sequelize.define("Cargo", {
@@ -102,7 +106,7 @@ const Cargo = sequelize.define("Cargo", {
     },
     name: {
         type: DataTypes.STRING,
-        allowNull:false
+        allowNull: false
     },
     typeTransport: {
         type: DataTypes.ARRAY(DataTypes.INTEGER),
@@ -115,7 +119,11 @@ const Cargo = sequelize.define("Cargo", {
     whatsApp: {
         type: DataTypes.TEXT,
         allowNull: true
-    }},
+    },
+    additional_info: {
+        type: DataTypes.TEXT,
+    }
+},
     {
         timestamps: true
     }
@@ -149,8 +157,11 @@ const Transport = sequelize.define("Transport", {
     whatsApp: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    additional_info: {
+        type: DataTypes.TEXT,
     }
-},{timestamps: true});
+}, { timestamps: true });
 
 const TransportType = sequelize.define("TransportType", {
     id: {
@@ -160,7 +171,7 @@ const TransportType = sequelize.define("TransportType", {
     },
     uuid: {
         type: DataTypes.UUID,
-        allowNull:false,
+        allowNull: false,
         defaultValue: () => uuidv4()
     },
     nameEn: {
@@ -182,7 +193,7 @@ const CargoType = sequelize.define("CargoType", {
     },
     uuid: {
         type: DataTypes.UUID,
-        allowNull:false,
+        allowNull: false,
         defaultValue: () => uuidv4()
     },
     nameEn: {
@@ -288,7 +299,7 @@ const Chat = sequelize.define("Chat", {
         type: DataTypes.ARRAY(DataTypes.INTEGER),
         defaultValue: []
     }
-}, {timestamps: true})
+}, { timestamps: true })
 
 const Message = sequelize.define("Message", {
     id: {
@@ -305,7 +316,7 @@ const Message = sequelize.define("Message", {
     text: {
         type: DataTypes.STRING,
     }
-}, {timestamps: true})
+}, { timestamps: true })
 
 
 const adminMessage = sequelize.define("AdminMessage", {
@@ -323,14 +334,14 @@ const adminMessage = sequelize.define("AdminMessage", {
     text: {
         type: DataTypes.STRING
     }
-}, {timestamps: true})
+}, { timestamps: true })
 
 
-Message.belongsTo(User, {foreignKey: 'senderId', as: 'sender'});
-User.hasMany(Message, {foreignKey: 'senderId', as: 'user_message'});
+Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
+User.hasMany(Message, { foreignKey: 'senderId', as: 'user_message' });
 
-adminMessage.belongsTo(User, {foreignKey: 'receiverId', as: 'receiver'});
-User.hasMany(adminMessage, {foreignKey: 'receiverId', as: 'admin_message'});
+adminMessage.belongsTo(User, { foreignKey: 'receiverId', as: 'receiver' });
+User.hasMany(adminMessage, { foreignKey: 'receiverId', as: 'admin_message' });
 
 
 //User connections with other models
@@ -340,43 +351,43 @@ User.hasMany(Cargo, { foreignKey: 'userId', as: 'cargos' });
 User.hasMany(Transport, { foreignKey: 'userId', as: 'transports' });
 
 //Cargotype connections
-Cargo.belongsTo(CargoType, {foreignKey: 'typeId', as: 'type'});
-CargoType.hasMany(Cargo, {foreignKey: 'typeId', as: 'cargos'});
-Cargo.belongsTo(country, {foreignKey: 'fromCountry', as: 'from_country'});
-country.hasMany(Cargo, {foreignKey: 'fromCountry', as: 'cargo_country'});
+Cargo.belongsTo(CargoType, { foreignKey: 'typeId', as: 'type' });
+CargoType.hasMany(Cargo, { foreignKey: 'typeId', as: 'cargos' });
+Cargo.belongsTo(country, { foreignKey: 'fromCountry', as: 'from_country' });
+country.hasMany(Cargo, { foreignKey: 'fromCountry', as: 'cargo_country' });
 
-Cargo.belongsTo(city, {foreignKey: 'fromCity', as: 'from_city'});
-city.hasMany(Cargo, {foreignKey: 'fromCountry', as: 'cargo_city'});
+Cargo.belongsTo(city, { foreignKey: 'fromCity', as: 'from_city' });
+city.hasMany(Cargo, { foreignKey: 'fromCountry', as: 'cargo_city' });
 
 
-Cargo.belongsTo(country, {foreignKey: 'toCountry', as: 'to_country'});
-country.hasMany(Cargo, {foreignKey: 'toCountry', as: 'toCountry'});
+Cargo.belongsTo(country, { foreignKey: 'toCountry', as: 'to_country' });
+country.hasMany(Cargo, { foreignKey: 'toCountry', as: 'toCountry' });
 
-Cargo.belongsTo(city, {foreignKey: 'toCity', as: 'to_city'});
-city.hasMany(Cargo, {foreignKey: 'toCity', as: 'toCity'});
+Cargo.belongsTo(city, { foreignKey: 'toCity', as: 'to_city' });
+city.hasMany(Cargo, { foreignKey: 'toCity', as: 'toCity' });
 
 //TrnasportType connections
-Transport.belongsTo(TransportType, {foreignKey: 'typeId', as: 'type'});
-TransportType.hasMany(Transport, {foreignKey: 'typeId', as: 'transports'});
+Transport.belongsTo(TransportType, { foreignKey: 'typeId', as: 'type' });
+TransportType.hasMany(Transport, { foreignKey: 'typeId', as: 'transports' });
 
 
 //country and others
-Transport.belongsTo(country, {foreignKey: 'belongsTo', as: 'affiliation_country'});
-country.hasMany(Transport, {foreignKey: 'belongsTo', as: 'affiliation_country'});
+Transport.belongsTo(country, { foreignKey: 'belongsTo', as: 'affiliation_country' });
+country.hasMany(Transport, { foreignKey: 'belongsTo', as: 'affiliation_country' });
 
-Transport.belongsTo(country, {foreignKey: 'locationCountry', as: 'location_country'});
-country.hasMany(Transport, {foreignKey: 'locationCountry', as: 'location_country'});
+Transport.belongsTo(country, { foreignKey: 'locationCountry', as: 'location_country' });
+country.hasMany(Transport, { foreignKey: 'locationCountry', as: 'location_country' });
 
-Transport.belongsTo(city, {foreignKey: 'locationCity', as: 'location_city'});
-country.hasMany(Transport, {foreignKey: 'locationCity', as: 'location_city'});
+Transport.belongsTo(city, { foreignKey: 'locationCity', as: 'location_city' });
+country.hasMany(Transport, { foreignKey: 'locationCity', as: 'location_city' });
 
 
 
 
 
 //country and city
-city.belongsTo(country, {foreignKey:'countryId', as: 'country'});
-country.hasMany(city, {foreignKey: 'countryId', as: 'country'});
+city.belongsTo(country, { foreignKey: 'countryId', as: 'country' });
+country.hasMany(city, { foreignKey: 'countryId', as: 'country' });
 
 
 module.exports = { Admin, User, Cargo, Transport, TransportType, CargoType, verificationCodes, country, city, Message, Chat, adminMessage };

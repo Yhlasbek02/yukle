@@ -4,6 +4,9 @@ class TransportTypeController {
     async addTransportType (req, res) {
         try {
             const {nameEn, nameRu, nameTr} = req.body;
+            if (!nameEn || !nameRu || !nameTr) {
+                return res.status(400).json({message: "All fields are required"});
+            }
             const newTransportType = await TransportType.create({nameEn, nameRu, nameTr});
             res.status(200).json({message: "Transport type added", newTransportType});
         } catch (error) {
@@ -48,8 +51,22 @@ class TransportTypeController {
 
     async getAllTransportType (req, res) {
         try {
-            const transportTypes = await TransportType.findAll({});
-            res.status(200).json({transportTypes});
+            const page = req.query.page || 1;
+            const limit = req.query.pageSize || 8;
+            const offset = (parseInt(page) - 1) * parseInt(limit);
+            let queryOptions = {
+                limit: parseInt(limit),
+                offset,
+                order: [['id', 'DESC']]
+            };
+            const { count, rows: transportTypes } = await TransportType.findAndCountAll(queryOptions);
+            const totalPages = Math.ceil(count / parseInt(limit));
+            res.status(200).json({
+                transportTypes,
+                totalPages,
+                totalTransportTypes: count,
+                currentPage: page
+            });
         } catch (error) {
             console.error(error);
             res.status(500).json({message: 'Failed to get transport types'});

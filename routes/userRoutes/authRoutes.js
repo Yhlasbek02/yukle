@@ -16,5 +16,5 @@ router.post("/resend-code/email/:lang", UserAuth.resendVerificationCodeByEmail);
 router.post("/verify-otp/:lang", UserAuth.verifyOtp);
 router.post("/change-pass/:lang", checkUserAuth, UserAuth.createNewPassword);
 router.get("/profile/:lang", checkUserAuth, UserAuth.getMyProfile);
-
+router.post("/change-account/:lang", checkUserAuth, UserAuth.editAccount);
 module.exports = router;

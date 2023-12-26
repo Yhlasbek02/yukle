@@ -50,6 +50,28 @@ router.post('/countries/save/eng', async (req, res) => {
 });
 
 
+router.post('/countries/add-empty-city', async (req, res) => {
+  try {
+    const countries = await country.findAll();
+    for (const country of countries) {
+      const cities = await city.findOne({where: {countryId: country.id}});
+      if (!cities){
+        await city.create({
+          nameEn: ' ',
+          nameRu: ' ',
+          nameTr: ' ',
+          countryId: country.id
+        })
+        console.log(country.nameEn, ' city added')
+      }
+    }
+    res.status(200).json({message: "Operation successfull"});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({message: "Error in getting add city"});
+  }
+})
+
 // router.post('/countries/save/ru', async (req, res) => {
 //   try {
 //     const countryCount = await country.count();

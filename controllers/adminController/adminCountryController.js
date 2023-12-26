@@ -1,15 +1,30 @@
-const {country, country} = require("../../models/models");
+const {country, city} = require("../../models/models");
 
 class CountryController {
+    async addCountry (req, res) {
+        try {
+            const {nameEn, nameRu, nameTr} = req.body;
+            const countryData = await country.findOne({where: {nameEn: nameEn}});
+            if (countryData) {
+                return res.status(404).json({message: "Country already exist"});
+            }
+            const newCountry = await country.create({nameEn, nameRu, nameTr});
+            res.status(200).json({message: "Country added", newCountry});
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({message: 'Error in adding country'});
+        }
+    }
     async getCountry (req, res) {
         try {
             const page = req.query.page || 1;
-            const limit = req.query.pageSize || 15;
-            const offset = (parseInt(page) - 1) * parseInt(pageSize);
+            const limit = req.query.pageSize || 8;
+            const offset = (parseInt(page) - 1) * parseInt(limit);
             const {searchKey} = req.query;
             let queryOptions = {
                 limit: parseInt(limit),
                 offset,
+                order: [['id', 'ASC']]
             };
             if (searchKey) {
                 queryOptions.where = {
@@ -39,7 +54,14 @@ class CountryController {
             if (!countryData) {
                 return res.status(404).json({message: "Country not found"});
             }
+            const cities = await city.findAll({where: {
+                countryId: countryData.id
+            }});
+            for (const city of cities) {
+                await city.destroy();
+            }
             await countryData.destroy();
+            
             res.status(200).json({message: "Country deleted successfully"});
         } catch (error) {
             console.error(error);
@@ -50,12 +72,15 @@ class CountryController {
     async editCountry (req, res) {
         try {
             const {id} = req.params;
-            const {country} = req.body;
+            const {nameEn, nameRu, nameTr} = req.body;
             const countryData = await country.findOne({where: {uuid: id}});
             if (!countryData) {
                 return res.status(404).json({message: "Country not found"});
             }
-            countryData.country = country;
+            countryData.nameEn = nameEn;
+            countryData.nameRu = nameRu;
+            countryData.nameTr = nameTr;
+            await countryData.save();
             res.status(200).json({message: "Country edited successfully"});
         } catch (error) {
             console.error(error);
@@ -63,21 +88,94 @@ class CountryController {
         }
     }
 
+    async getCities (req, res) {
+        try {
+            const id = req.query.country;
+            const page = req.query.page || 1;
+            const limit = req.query.pageSize || 8;
+            const offset = (parseInt(page) - 1) * parseInt(limit);
+            const {searchKey} = req.query;
+            let queryOptions = {
+                limit: parseInt(limit),
+                offset,
+            };
+            if (id) {
+                const Country = await country.findOne({where: {uuid: id}});
+                if (searchKey) {
+                    queryOptions.where = {
+                        countryId: id,
+                        country: {
+                            [Op.like]: `%${searchKey}%`
+                        }
+                    };
+                } else {
+                    queryOptions.where = {
+                        countryId: Country.id
+                    }
+                }
+            }
+            
+            const { count, rows: cities } = await city.findAndCountAll(queryOptions);
+            const totalPages = Math.ceil(count / parseInt(limit));
+            res.status(200).json({
+                cities,
+                totalPages,
+                totalCities: count,
+                currentPage: page
+            })
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({message: "Error in getting city"});
+        }
+    }
+
     async addCity (req, res) {
         try {
-            const {id} = req.params;
-            const {city} = req.body;
-            const countryData = await country.findOne({where: {uuid: id}});
-            if (!countryData) {
-                return res.status(404).json({message: "Country not found"});
-            }
-            const updatedCountry = await country.update({
-                cities: [...countryData.cities, city]
+            const {nameEn, nameRu, nameTr, countryId} = req.body;
+            console.log(req.body);
+            const newCity = await city.create({
+                nameEn, nameRu, nameTr, countryId
             });
-            res.status(200).json({message: 'City successfully added', updatedCountry});
+            
+            res.status(200).json({message: 'City successfully added', newCity});
         } catch (error) {
             console.error(error);
             res.status(500).json({message: "Error in adding city"});
+        }
+    }
+
+    async editCity (req, res) {
+        try {
+            const {id} = req.params;
+            const {nameEn, nameRu, nameTr, countryId} = req.body;
+            const city = await city.findOne({where: {uuid: id}});
+            if (!city) {
+                return res.status(404).json({message: "Not found"});
+            }
+            city.nameEn = nameEn;
+            city.nameRu = nameRu;
+            city.nameTr = nameTr;
+            city.countryId = countryId;
+            await city.save();
+            res.status(200).json({message: "City updated", city});
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({message: "Error in editing city"});
+        }
+    }
+
+    async deleteCity (req, res) {
+        try {
+            const {id} = req.params;
+            const city = await city.findOne({where: {uuid: id}});
+            if (!city) {
+                return res.status(404).json({message: "City not found"});
+            }
+            await city.destroy();
+            res.status(200).json({message: "City deleted successfully"});
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({message: "Error in deleting city"});
         }
     }
 }

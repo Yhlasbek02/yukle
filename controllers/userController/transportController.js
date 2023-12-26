@@ -44,14 +44,18 @@ class transportController {
                 phoneNumber,
                 email,
                 desiredDirection,
-                whatsApp } = req.body;
-            if (!typeId || !belongsTo || !locationCountry || !locationCity || !name || !phoneNumber || !email) {
-                if (lang === "en"){
-                    return res.status(404).json({ message: "Fields are required" });
-                } if (lang === "ru") {
-                    return res.status(404).json({ message: "Fields are required" });
-                } if (lang === "tr") {
-                    return res.status(404).json({ message: "Fields are required" });
+                whatsApp,
+                additional_info
+             } = req.body; 
+            if (!typeId || !belongsTo || !locationCountry || !name) {
+                if (!phoneNumber && !email) {
+                    if (lang === "en"){
+                        return res.status(404).json({ message: "Fields are required" });
+                    } if (lang === "ru") {
+                        return res.status(404).json({ message: "Fields are required" });
+                    } if (lang === "tr") {
+                        return res.status(404).json({ message: "Fields are required" });
+                    }
                 }
             }
             const userId = req.user.id;
@@ -65,7 +69,8 @@ class transportController {
                 email,
                 phoneNumber,
                 name,
-                userId: userId
+                userId: userId,
+                additional_info
             });
 
             if (lang === "en"){
@@ -258,10 +263,40 @@ class transportController {
         }
     }
 
-    async editTransport(req, res) {
+    async specificTransport(req, res) {
         try {
             const { id, lang } = req.params;
-            const transport = await Transport.findOne({ where: { uuid: id } });
+            const transport = await Transport.findOne({ 
+                where: { uuid: id },
+                include: [
+                    {
+                        model: User,
+                        as: "user",
+                        attributes: {exclude: ['password']}
+                    },
+                    {
+                        model: TransportType,
+                        as: "type",
+                        attributes: attributes[lang]
+                    },
+                    {
+                        model: country,
+                        as: "affiliation_country",
+                        attributes: attributes[lang]
+                    },
+                    {
+                        model: country,
+                        as: "location_country",
+                        attributes: attributes[lang]
+                    },
+                    {
+                        model: city,
+                        as: "location_city",
+                        attributes: attributes[lang]
+                    },
+
+                ]
+            });
             if (!transport) {
                 if (lang === "en"){
                     return res.status(404).json({ message: "Cargo not found" });
@@ -272,15 +307,8 @@ class transportController {
                 }
                 
             }
-            await transport.update(req.body);
-            if (lang === "en"){
-                return res.status(200).json({ message: "Cargo successfully edited", transport });
-            } if (lang === "ru") {
-                return res.status(200).json({ message: "Cargo successfully edited", transport });
-            } if (lang === "tr") {
-                return res.status(200).json({ message: "Cargo successfully edited", transport });
-            }
             
+            res.status(200).json({ transport });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Error in editing cargo" });

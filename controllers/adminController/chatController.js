@@ -23,7 +23,7 @@ class chatController {
     async getAllMessages (req, res) {
         try {
             const page = req.query.page || 1;
-            const pageSize = req.query.pageSize || 20;
+            const pageSize = req.query.pageSize || 10;
     
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const totalMessages = await Message.count();
@@ -53,7 +53,7 @@ class chatController {
     async getSpecificMessage (req, res) {
         try {
             const {id}= req.params;
-            const message = await Message.findOne({where: {senderId: id}});
+            const message = await Message.findAll({where: {senderId: id}});
             let adminMessages = await adminMessage.findAll({where: {receiverId: id}});
             if (!message) {
                 return res.status(404).json({message: "Message not found"});

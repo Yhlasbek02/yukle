@@ -43,16 +43,19 @@ class CargoController {
                 phoneNumber,
                 name,
                 email,
-                whatsApp
+                whatsApp,
+                additional_info
             } = req.body;
 
-            if (!typeId || !fromCity || !fromCountry || !toCountry || !toCity || !weight || !name || !phoneNumber) {
-                if (lang === "en") {
-                    return res.status(409).json({ message: "Fields are required" });
-                } if (lang === "ru") {
-                    return res.status(409).json({ message: "Fields are required" });
-                } if (lang === "tr") {
-                    return res.status(409).json({ message: "Fields are required" });
+            if (!typeId || !fromCity || !fromCountry || !toCountry || !toCity || !weight || !name) {
+                if (!phoneNumber && !email) {
+                    if (lang === "en") {
+                        return res.status(409).json({ message: "Fields are required" });
+                    } if (lang === "ru") {
+                        return res.status(409).json({ message: "Fields are required" });
+                    } if (lang === "tr") {
+                        return res.status(409).json({ message: "Fields are required" });
+                    }
                 }
             }
             const userId = req.user.id;
@@ -69,22 +72,28 @@ class CargoController {
                 name,
                 whatsApp: whatsApp,
                 userId: userId,
+                additional_info
             });
             const transports = await Transport.findAll({ where: { belongsTo: fromCountry } });
             const notificationPromises = [];
+            let tokens = []
 
             for (const transport of transports) {
                 const user = await User.findByPk(transport.id);
                 if (user.cargoNotification === true && user.fcm_token) {
-                    const message = {
-                        notification: {
-                            title: 'New Cargo Available',
-                            body: 'A new cargo matching your preferences has been added.',
-                            imageUrl: req.body.imageUrl,
-                        },
-                        token: user.fcm_token,
-                    };
-                    notificationPromises.push(messaging.send(message));
+                    if (!tokens.includes(user.fcm_token)) {
+                        tokens.push(user.fcm_token);
+                        const message = {
+                            notification: {
+                                title: 'New Cargo Available',
+                                body: 'A new cargo has been added.',
+                                imageUrl: req.body.imageUrl,
+                            },
+                            token: user.fcm_token,
+                        };
+                        notificationPromises.push(messaging.send(message));    
+                    }
+                    
                 }
             }
 
@@ -301,10 +310,44 @@ class CargoController {
         }
     }
 
-    async editCargo(req, res) {
+    async specificCargo(req, res) {
         try {
             const { id, lang } = req.params;
-            const cargo = await Cargo.findOne({ where: { uuid: id } });
+            const cargo = await Cargo.findOne({ 
+                where: { uuid: id },
+                include: [
+                    {
+                        model: User,
+                        as: "user",
+                        attributes: attributes[lang]
+                    },
+                    {
+                        model: CargoType,
+                        as: "type",
+                        attributes: attributes[lang]
+                    },
+                    {
+                        model: country,
+                        as: "from_country",
+                        attributes: attributes[lang]
+                    },
+                    {
+                        model: country,
+                        as: "to_country",
+                        attributes: attributes[lang]
+                    },
+                    {
+                        model: city,
+                        as: "from_city",
+                        attributes: attributes[lang]
+                    },
+                    {
+                        model: city,
+                        as: "to_city",
+                        attributes: attributes[lang]
+                    }
+                ]
+            });
             if (!cargo) {
                 if (lang === "en") {
                     return res.status(404).json({ message: "Cargo not found" });
@@ -314,14 +357,7 @@ class CargoController {
                     return res.status(404).json({ message: "Cargos not found" });
                 }
             }
-            await cargo.update(req.body);
-            if (lang === "en") {
-                return res.status(200).json({ message: "Cargo successfully edited", cargo });
-            } if (lang === "ru") {
-                return res.status(200).json({ message: "Cargo successfully edited", cargo });
-            } if (lang === "tr") {
-                return res.status(200).json({ message: "Cargo successfully edited", cargo });
-            }
+            res.status(200).json({ cargo });            
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Error in editing cargo" });

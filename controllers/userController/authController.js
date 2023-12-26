@@ -523,9 +523,10 @@ class UserAuthentification {
 
     async editAccount (req, res) {
         try {
-            const {id} = req.params;
+            const id = req.user.id;
             const {lang} = req.params;
-            const user = await User.findOne({where: {uuid: id}});
+            const {name, surname, email, phoneNumber} = req.body;
+            const user = await User.findOne({where: {id: id}});
             if (!user) {
                 if (lang === "en"){
                     return res.status(404).json({ error: "User not found" });
@@ -534,15 +535,28 @@ class UserAuthentification {
                 } if (lang === "tr") {
                     return res.status(404).json({ error: "User not found" });
                 }
+            }   
+            if (email === user.email) {
+                await user.update(req.body);
+                return res.status(200).json({user});
             }
+            var mailOptions = {
+                require: "yukleteam023@gmail.com",
+                to: user.email,
+                subject: "Email changed",
+                html: "Your email changed"
+            };
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    console.error(error);
+                }
+                console.log('====================================');
+                console.log('Message sent: %s', info.messageId);
+                console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));     
+                
+            });
             await user.update(req.body);
-            if (lang === "en"){
-                return res.status(200).json({message: "User successfully edited", user});
-            } if (lang === "ru") {
-                return res.status(200).json({message: "User successfully edited", user});
-            } if (lang === "tr") {
-                return res.status(200).json({message: "User successfully edited", user});
-            }
+            res.status(200).json({user});
         } catch (error) {
             console.error(error);
             res.status(500).json({message: "Account successfully edited"});

@@ -88,10 +88,11 @@ class countryController {
                 tr: { exclude: ['nameEn', 'nameRu'] },
             };
 
-            const cities = await city.findAll({ where: whereClauses, attributes: attributes[lang] || {} });
+            let cities = await city.findAll({ where: whereClauses, attributes: attributes[lang] || {} });
 
             if (cities.length === 0) {
-                return res.status(404).json({ message: 'Cities not found' });
+                cities = []
+                return res.status(200).json({ cities });
             }
 
             res.status(200).json({ cities });

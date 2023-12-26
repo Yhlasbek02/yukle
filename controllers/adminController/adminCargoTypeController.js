@@ -48,8 +48,22 @@ class CargoTypeController {
 
     async getAllCargoType (req, res) {
         try {
-            const cargoTypes = await CargoType.findAll({});
-            res.status(200).json({cargoTypes});
+            const page = req.query.page || 1;
+            const limit = req.query.pageSize || 10;
+            const offset = (parseInt(page) - 1) * parseInt(limit);
+            let queryOptions = {
+                limit: parseInt(limit),
+                offset,
+                order: [['id', 'DESC']]
+            };
+            const { count, rows: cargoTypes } = await CargoType.findAndCountAll(queryOptions);
+            const totalPages = Math.ceil(count / parseInt(limit));
+            res.status(200).json({
+                cargoTypes,
+                totalPages,
+                totalCargoTypes: count,
+                currentPage: page
+            })
         } catch (error) {
             console.error(error);
             res.status(500).json({message: 'Failed to get cargo types'});

@@ -9,7 +9,7 @@ class CargoController {
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';
             const sortOrder = req.query.order || 'ASC';
-            const cargos = await Cargo.findAndCountAll({
+            const cargo = await Cargo.findAndCountAll({
                 offset,
                 limit: parseInt(pageSize),
                 order: [[sort, sortOrder]],
@@ -40,15 +40,16 @@ class CargoController {
                     }
                 ]
             });
-            let totalCargo = cargos.count;
-            if (!cargos || cargos.length === 0) {
-                return res.status(404).json({error: "Cargos not found"});
+            let totalCargos = cargo.count;
+            let cargos = cargo.rows;
+            if (cargos.length === 0) {
+                cargos = []
             }
             res.status(200).json({
                 cargos,
-                totalCargo,
+                totalCargos,
                 currentPage: page,
-                totalPages: Math.ceil(totalCargo / pageSize)
+                totalPages: Math.ceil(totalCargos / pageSize)
             });
         } catch (error) {
             console.error(error);

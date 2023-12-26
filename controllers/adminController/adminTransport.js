@@ -8,8 +8,8 @@ class TransportController {
     
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';
-            const sortOrder = req.query.order || 'ASC';
-            const transports = await Transport.findAndCountAll({
+            const sortOrder = req.query.order || 'DESC';
+            let transport = await Transport.findAndCountAll({
                 offset,
                 limit: parseInt(pageSize),
                 order: [[sort, sortOrder]],
@@ -36,10 +36,12 @@ class TransportController {
                     },
                 ]
             });
-            let totalTransport = transports.count;
-            if (!transports || transports.length === 0) {
-                return res.status(404).json({error: "Transports not found"});
+            let totalTransport = transport.count;
+            let transports = transport.rows;
+            if (transports.length === 0) {
+                transports = [];
             }
+            
             res.status(200).json({
                 transports,
                 totalTransport,
