@@ -313,6 +313,11 @@ class CargoController {
     async specificCargo(req, res) {
         try {
             const { id, lang } = req.params;
+            const attributes = {
+                en: { exclude: ['nameRu', 'nameTr'] },
+                ru: { exclude: ['nameEn', 'nameTr'] },
+                tr: { exclude: ['nameEn', 'nameRu'] },
+            };
             const cargo = await Cargo.findOne({ 
                 where: { uuid: id },
                 include: [

@@ -1,4 +1,4 @@
-const {Message, Chat, User, adminMessage} = require("../../models/models");
+const {Message, adminMessage} = require("../../models/models");
 
 class ChatController {
     async addMessage(req, res) {
@@ -20,16 +20,14 @@ class ChatController {
             const id = req.user.id;
             let messages = await Message.findAll({
                 where: {senderId: id},
-                order: [['id', 'DESC']],
-            });
-            if (!messages) {
-                messages = []
-            }
-            let adminMessages = await adminMessage.findAll({
-                where: {receiverId: id},
-                order: [['id', 'DESC']]
+                include: [
+                    {
+                        model: adminMessage,
+                        as: "user_message"
+                    }
+                ]
             }) || [];
-            res.status(200).json({messages, adminMessages});
+            res.status(200).json({messages});
         } catch (error) {
             console.error(error);
             res.status(500).json({message: "Error in getting messages"});

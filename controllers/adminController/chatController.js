@@ -5,13 +5,14 @@ class chatController {
         try {
             const {id} = req.params;
             const {text} = req.body;
-            const userMessage = await Message.findOne({where: {id: id}});
+            console.log(id, text);
+            const userMessage = await Message.findOne({where: {uuid: id}});
             if (!userMessage) {
                 return res.status(404).json({message: "Message not found"});
             }
             const newMessage = await adminMessage.create({
                 text: text,
-                receiverId: userMessage.senderId
+                messageId: userMessage.id
             });
             res.status(200).json({newMessage});
         } catch (error) {
@@ -50,17 +51,29 @@ class chatController {
         }
     }
 
-    async getSpecificMessage (req, res) {
+    async deleteMessage (req, res) {
         try {
-            const {id}= req.params;
-            const message = await Message.findAll({where: {senderId: id}});
-            let adminMessages = await adminMessage.findAll({where: {receiverId: id}});
+            const {id} = req.params;
+            const message = await Message.findOne({where: {uuid: id}});
             if (!message) {
                 return res.status(404).json({message: "Message not found"});
             }
-            if (!adminMessages) {
-                adminMessages = []
+            await message.destroy()
+            res.status(200).json({message: "Message deleted"});
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({message: "Error in getting messages"});
+        }
+    }
+
+    async getSpecificMessage (req, res) {
+        try {
+            const {id}= req.params;
+            const message = await Message.findOne({where: {uuid: id}});
+            if (!message) {
+                return res.status(404).json({message: "Message not found"});
             }
+            const adminMessages = await adminMessage.findAll({where: {messageId: message.id}}) || [];
             res.status(200).json({message, adminMessages});
         } catch (error) {
             console.error(error);

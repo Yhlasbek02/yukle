@@ -9,7 +9,7 @@ class CargoController {
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';
             const sortOrder = req.query.order || 'ASC';
-            const cargo = await Cargo.findAndCountAll({
+            let cargo = await Cargo.findAndCountAll({
                 offset,
                 limit: parseInt(pageSize),
                 order: [[sort, sortOrder]],
@@ -43,7 +43,7 @@ class CargoController {
             let totalCargos = cargo.count;
             let cargos = cargo.rows;
             if (cargos.length === 0) {
-                cargos = []
+                cargos = [];
             }
             res.status(200).json({
                 cargos,

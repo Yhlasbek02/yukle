@@ -1,4 +1,5 @@
 const {country, city} = require("../../models/models");
+const {Op} = require("sequelize");
 
 class CountryController {
     async addCountry (req, res) {
@@ -18,7 +19,7 @@ class CountryController {
     async getCountry (req, res) {
         try {
             const page = req.query.page || 1;
-            const limit = req.query.pageSize || 8;
+            const limit = req.query.pageSize || 7;
             const offset = (parseInt(page) - 1) * parseInt(limit);
             const {searchKey} = req.query;
             let queryOptions = {
@@ -28,9 +29,11 @@ class CountryController {
             };
             if (searchKey) {
                 queryOptions.where = {
-                    country: {
-                        [Op.like]: `%${searchKey}%`
-                    }
+                    [Op.or]: [
+                        { nameEn: { [Op.iLike]: `%${searchKey}%` } },
+                        { nameRu: { [Op.iLike]: `%${searchKey}%` } },
+                        { nameTr: { [Op.iLike]: `%${searchKey}%` } },
+                    ]
                 };
             }
             const { count, rows: countries } = await country.findAndCountAll(queryOptions);
@@ -92,26 +95,46 @@ class CountryController {
         try {
             const id = req.query.country;
             const page = req.query.page || 1;
-            const limit = req.query.pageSize || 8;
-            const offset = (parseInt(page) - 1) * parseInt(limit);
+            const limit = Math.max(req.query.pageSize || 8, 1);
+            const offset = Math.max((parseInt(page) - 1) * parseInt(limit), 0);
             const {searchKey} = req.query;
             let queryOptions = {
                 limit: parseInt(limit),
                 offset,
+                include: [{
+                    model: country,
+                    as: 'country'
+
+                }],
+                order: [
+                    ['id', 'ASC']
+                ]
             };
             if (id) {
                 const Country = await country.findOne({where: {uuid: id}});
                 if (searchKey) {
                     queryOptions.where = {
-                        countryId: id,
-                        country: {
-                            [Op.like]: `%${searchKey}%`
-                        }
+                        countryId: Country.id,
+                        [Op.or]: [
+                            { nameEn: { [Op.iLike]: `%${searchKey}%` } },
+                            { nameRu: { [Op.iLike]: `%${searchKey}%` } },
+                            { nameTr: { [Op.iLike]: `%${searchKey}%` } },
+                        ]
                     };
                 } else {
                     queryOptions.where = {
-                        countryId: Country.id
+                        countryId: Country.id,
                     }
+                }
+            } else {
+                if (searchKey) {
+                    queryOptions.where = {
+                        [Op.or]: [
+                            { nameEn: { [Op.iLike]: `%${searchKey}%` } },
+                            { nameRu: { [Op.iLike]: `%${searchKey}%` } },
+                            { nameTr: { [Op.iLike]: `%${searchKey}%` } },
+                        ]
+                    };
                 }
             }
             
@@ -148,15 +171,15 @@ class CountryController {
         try {
             const {id} = req.params;
             const {nameEn, nameRu, nameTr, countryId} = req.body;
-            const city = await city.findOne({where: {uuid: id}});
-            if (!city) {
+            const City = await city.findOne({where: {uuid: id}});
+            if (!City) {
                 return res.status(404).json({message: "Not found"});
             }
-            city.nameEn = nameEn;
-            city.nameRu = nameRu;
-            city.nameTr = nameTr;
-            city.countryId = countryId;
-            await city.save();
+            City.nameEn = nameEn;
+            City.nameRu = nameRu;
+            City.nameTr = nameTr;
+            City.countryId = countryId;
+            await City.save();
             res.status(200).json({message: "City updated", city});
         } catch (error) {
             console.error(error);
@@ -167,11 +190,11 @@ class CountryController {
     async deleteCity (req, res) {
         try {
             const {id} = req.params;
-            const city = await city.findOne({where: {uuid: id}});
-            if (!city) {
+            const cityData = await city.findOne({where: {uuid: id}});
+            if (!cityData) {
                 return res.status(404).json({message: "City not found"});
             }
-            await city.destroy();
+            await cityData.destroy();
             res.status(200).json({message: "City deleted successfully"});
         } catch (error) {
             console.error(error);

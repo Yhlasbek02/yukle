@@ -217,7 +217,7 @@ const verificationCodes = sequelize.define("Codes", {
     uuid: {
         type: DataTypes.UUID,
         allowNull: false,
-        defaultValue: DataTypes.UUIDV4
+        defaultValue: () => uuidv4()
     },
     code: {
         type: DataTypes.INTEGER,
@@ -243,7 +243,7 @@ const country = sequelize.define("Country", {
     uuid: {
         type: DataTypes.UUID,
         allowNull: false,
-        defaultValue: DataTypes.UUIDV4
+        defaultValue: () => uuidv4()
     },
     nameEn: {
         type: DataTypes.STRING
@@ -266,7 +266,7 @@ const city = sequelize.define("City", {
     uuid: {
         type: DataTypes.UUID,
         allowNull: false,
-        defaultValue: DataTypes.UUIDV4
+        defaultValue: () => uuidv4()
     },
     nameEn: {
         type: DataTypes.STRING
@@ -279,27 +279,6 @@ const city = sequelize.define("City", {
     }
 })
 
-const Chat = sequelize.define("Chat", {
-    id: {
-        type: DataTypes.BIGINT,
-        primaryKey: true,
-        autoIncrement: true,
-        allowNull: false
-    },
-    uuid: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        defaultValue: DataTypes.UUIDV4
-    },
-    users: {
-        type: DataTypes.ARRAY(DataTypes.INTEGER),
-        defaultValue: []
-    },
-    messages: {
-        type: DataTypes.ARRAY(DataTypes.INTEGER),
-        defaultValue: []
-    }
-}, { timestamps: true })
 
 const Message = sequelize.define("Message", {
     id: {
@@ -336,13 +315,12 @@ const adminMessage = sequelize.define("AdminMessage", {
     }
 }, { timestamps: true })
 
+Message.belongsTo(User, {foreignKey: 'senderId', as: "sender"});
+User.hasMany(Message, {foreignKey: 'senderId', as: "messages"});
 
-Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
-User.hasMany(Message, { foreignKey: 'senderId', as: 'user_message' });
 
-adminMessage.belongsTo(User, { foreignKey: 'receiverId', as: 'receiver' });
-User.hasMany(adminMessage, { foreignKey: 'receiverId', as: 'admin_message' });
-
+adminMessage.belongsTo(Message, { foreignKey: 'messageId', as: 'message' });
+Message.hasMany(adminMessage, { foreignKey: 'messageId', as: 'user_message' });
 
 //User connections with other models
 Cargo.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -390,4 +368,4 @@ city.belongsTo(country, { foreignKey: 'countryId', as: 'country' });
 country.hasMany(city, { foreignKey: 'countryId', as: 'country' });
 
 
-module.exports = { Admin, User, Cargo, Transport, TransportType, CargoType, verificationCodes, country, city, Message, Chat, adminMessage };
+module.exports = { Admin, User, Cargo, Transport, TransportType, CargoType, verificationCodes, country, city, Message, adminMessage };

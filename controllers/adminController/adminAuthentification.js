@@ -49,7 +49,9 @@ class AdminAuthentification {
             const isMatch = await bcryptjs.compare(password, admin.password);
             if (isMatch && admin.username === username) {
                 const token = jwt.sign({adminId: admin.id}, process.env.SECRET_KEY, {expiresIn: '1 years'});
-                res.status(200).json({message: "Admin login successfull", token});
+                return res.status(200).json({message: "Admin login successfull", token});
+            } else {
+                return res.status(404).json({message: "Password is wrong"});
             } 
         } catch (error) {
             console.log(error);
