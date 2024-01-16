@@ -275,11 +275,18 @@ class UserAuthentification {
             console.log(otp);
             const OTP = code.code;
             console.log(OTP);
-            const user = await User.findOne({
+            let user = await User.findOne({
                 where: {
                     email: email
                 }
             })
+            if (!user) {
+                user = await User.findOne({
+                    where: {
+                        phoneNumber: email
+                    }
+                })
+            }
             user.verified = true;
             await user.save();
             const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '10 days' });
@@ -381,14 +388,14 @@ class UserAuthentification {
             if (user.phoneNumber === phoneNumber && isMatch) {
                 if (user.verified === false) {
                     if (lang === "en") {
-                        return res.status(400).json({ message: "Please verify your phoneNumber" });
+                        return res.status(400).json({ message: "Please verify your email" });
                     } if (lang === "ru") {
-                        return res.status(400).json({ message: "Please verify your phoneNumber russian" });
+                        return res.status(400).json({ message: "Please verify your email russian" });
                     } if (lang === "tr") {
-                        return res.status(400).json({ message: "Please verify your phoneNumber turkish" });
+                        return res.status(400).json({ message: "Please verify your email turkish" });
                     }
                 }
-                const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '7 days' });
+                const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '99 days' });
                 if (lang === "en") {
                     return res.status(200).json({ message: "Login successful", token });
                 } if (lang === "ru") {
@@ -397,9 +404,18 @@ class UserAuthentification {
                     return res.status(200).json({ message: "Login successful turkish", token });
                 }
             }
+            else {
+                if (lang === "en") {
+                    return res.status(404).json({ message: "Password is wrong! Try again" })
+                } if (lang === "ru") {
+                    return res.status(404).json({ message: "Password is wrong! Try again russian" })
+                } if (lang === "tr") {
+                    return res.status(404).json({ message: "Password is wrong! Try again turkish" })
+                }
+            }
         } catch (error) {
             console.error(error);
-            res.status(500).json({ message: "Error in login by mobile" });
+            res.status(500).json({ message: "Error in login by email" });
         }
     }
 

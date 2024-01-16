@@ -4,7 +4,7 @@ class CargoController {
     async getCargos (req, res) {
         try {
             const page = req.query.page || 1;
-            const pageSize = req.query.pageSize || 15;
+            const pageSize = req.query.pageSize || 8;
     
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';

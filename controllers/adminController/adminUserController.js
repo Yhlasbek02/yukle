@@ -4,7 +4,7 @@ class UserController {
     async getAllUsers (req, res) {
         try {
             const page = req.query.page || 1;
-            const limit = req.query.pageSize || 10;
+            const limit = req.query.pageSize || 8;
             const offset = (parseInt(page) - 1) * parseInt(limit);
             const {searchKey} = req.query;
             let queryOptions = {
