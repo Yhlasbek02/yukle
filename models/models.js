@@ -290,7 +290,7 @@ const Message = sequelize.define("Message", {
     uuid: {
         type: DataTypes.UUID,
         allowNull: false,
-        defaultValue: DataTypes.UUIDV4
+        defaultValue: () => uuidv4()
     },
     text: {
         type: DataTypes.STRING,
@@ -308,12 +308,35 @@ const adminMessage = sequelize.define("AdminMessage", {
     uuid: {
         type: DataTypes.UUID,
         allowNull: false,
-        defaultValue: DataTypes.UUIDV4
+        defaultValue: () => uuidv4()
     },
     text: {
         type: DataTypes.STRING
     }
-}, { timestamps: true })
+}, { timestamps: true });
+
+const Notifications = sequelize.define("Notification", {
+    id: {
+        type: DataTypes.BIGINT,
+        primaryKey: true,
+        autoIncrement: true,
+        allowNull: false
+    },
+    uuid: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        defaultValue: () => uuidv4()
+    },
+    userIds: {
+        type: DataTypes.ARRAY(DataTypes.INTEGER)
+    },
+    body: {
+        type: DataTypes.STRING
+    },
+    url: {
+        type: DataTypes.STRING
+    }
+})
 
 Message.belongsTo(User, {foreignKey: 'senderId', as: "sender"});
 User.hasMany(Message, {foreignKey: 'senderId', as: "messages"});
@@ -368,4 +391,4 @@ city.belongsTo(country, { foreignKey: 'countryId', as: 'country' });
 country.hasMany(city, { foreignKey: 'countryId', as: 'country' });
 
 
-module.exports = { Admin, User, Cargo, Transport, TransportType, CargoType, verificationCodes, country, city, Message, adminMessage };
+module.exports = { Admin, User, Cargo, Transport, TransportType, CargoType, verificationCodes, country, city, Message, adminMessage, Notifications };

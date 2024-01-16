@@ -1,6 +1,15 @@
 const {Admin, verificationCodes} = require("../../models/models");
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+let transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    auth:{
+        user: 'yukleteam023@gmail.com',
+        pass: 'wetlwjijdqhyfpmd',
+    }
+});
+
 
 class AdminAuthentification {
     async registerAdmin (req, res) {
@@ -67,7 +76,7 @@ class AdminAuthentification {
             }
             const admin = await Admin.findOne({where: {email: email}});
             if (!admin) {
-                return res.status(404).json({message: "Email is not valid"});
+                return res.status(404).json({status: false, message: "Email is not valid"});
             }
             const randomNumber = Math.floor(Math.random() * 9000) + 1000;
             console.log(randomNumber);
@@ -85,49 +94,44 @@ class AdminAuthentification {
             };
             transporter.sendMail(mailOptions, (error, info) => {
                 if (error) {
-                    console.error(error);
+                    return console.error(error);
                 }
                 if (!info.messageId) {
-                    console.error("Message ID is undefined. Email may not have been sent.");
+                    return console.error("Message ID is undefined. Email may not have been sent.");
                 }
                 console.log('====================================');
                 console.log('Message sent: %s', info.messageId);
                 console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
             });
-            res.status(200).json({message: "Please verify your number"});
+            res.status(200).json({status: true, message: "Please verify your number"});
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Internal server error"});
+            res.status(500).json({status: false, message: "Internal server error"});
         }
     }
 
     async verifyCode (req, res) {
         try {
-            const {otp, email} = req.body;
-            const code = await verificationCodes.findOne({where: {code: otp, emailOrNumber: email}});
+            const {otp} = req.body;
+            const code = await verificationCodes.findOne({where: {code: otp}});
             if (!code) {
-                return res.status(404).json({message: "Verificartion code is wrong"})
+                return res.status(404).json({status: false, message: "Verificartion code is wrong"})
             }
             const expireTime = code.expireTime;
             const now = new Date(Date.now());
             if (expireTime <= now) {
-                if (lang === "en"){
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again."});
-                } if (lang === "ru") {
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again russain"});
-                } if (lang === "tr") {
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again turkish"});
-                }
+                return res.status(401).json({status: false, message: "Verification code has expired! Please resend it again."});
             }
+            
             const admin = await Admin.findOne({where: {
-                email: email
+                email: code.emailOrNumber
             }})
             const token = jwt.sign({adminId: admin.id}, process.env.SECRET_KEY, {expiresIn: '1 year'});
             await code.destroy();
-            res.status(200).json({message: "Verification is true", token});
+            res.status(200).json({status: true, message: "Verification is true", token});
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Internal server error"});
+            res.status(500).json({status: false, message: "Internal server error"});
         }
     }
 
@@ -152,21 +156,24 @@ class AdminAuthentification {
         const {password, password_conf} = req.body;
         try {
             if (password !== password_conf) {
-                return res.status(400).json({message: "Password and confirmation not match"});
+                return res.status(400).json({status: false, message: "Password and confirmation not match"});
+            }
+            if (password.length < 4) {
+                return res.status(400).json({status:false, message: "Password must be at least 4 characters long"});
             }
             const id = req.admin.id;
             const admin = await Admin.findOne({where: {id}});
             if (!admin) {
-                res.status(404).json({message: "Admin not found"});
+                res.status(404).json({status: false, message: "Admin not found"});
             }
             const salt = await bcryptjs.genSalt(10);
             const hashPassword = await bcryptjs.hash(password, salt);
             admin.password = hashPassword;
             await admin.save();
-            res.status(200).json({message: "Password successfully edited"});
+            res.status(200).json({status: true, message: "Password successfully edited"});
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Failed to edit password"});
+            res.status(500).json({status: false, message: "Failed to edit password"});
         }
     }
 

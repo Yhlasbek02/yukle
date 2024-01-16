@@ -11,11 +11,17 @@ const country = require("./controllers/countryController");
 const {verificationCodes, User} = require("./models/models");
 dotenv.config();
 const app = express();
+const server = http.createServer(app);
+const expressWs = require("express-ws")(app, server);
+const UserAuthentification = require("./controllers/userController/authController");
+const dirname = path.resolve();
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 const PORT = 3001 || 8000;
 app.use(cookieParser());
 app.use(express.json());
+UserAuthentification.setWebSocketServer(expressWs.getWss());
+app.use("/", express.static(path.join(__dirname, "build")));
 app.use("/api", routes);
 app.use("/", country);
 app.all("*", (req, res, next) => {
@@ -48,7 +54,6 @@ app.all("*", (req, res, next) => {
 // setInterval(deleteExpriredUsers, 3 * 60 * 1000);
 
 const start = async () => {
-  const server = http.createServer(app);
   try {
     await sequelize.authenticate();
     await sequelize.sync({alter:true});

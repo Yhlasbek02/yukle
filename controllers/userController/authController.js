@@ -1,11 +1,22 @@
-const {User, verificationCodes} = require("../../models/models");
+const { User, verificationCodes } = require("../../models/models");
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+const WebSocket = require("ws");
+const EventEmitter = require("events");
+const MAX_LISTENERS = 20;
+EventEmitter.defaultMaxListeners = MAX_LISTENERS;
+
+let wss;
+const emitter = new EventEmitter();
+emitter.setMaxListeners(MAX_LISTENERS);
+
+const activeClients = new Set();
+
 
 let transporter = nodemailer.createTransport({
     service: 'Gmail',
-    auth:{
+    auth: {
         user: 'yukleteam023@gmail.com',
         pass: 'wetlwjijdqhyfpmd',
     }
@@ -14,32 +25,80 @@ let transporter = nodemailer.createTransport({
 
 
 class UserAuthentification {
-    async registerUserByEmail (req, res) {
+
+    static setWebSocketServer() {
         try {
-            const {name, surname, email, password} = req.body;
-            const {lang} = req.params;
-            const user = await User.findOne({where: {email: email}});
-            if (user){
-                if (lang === "en"){
-                    return res.status(409).json({message: "User already exists"});
+            wss = new WebSocket.Server({ port: 3002 });
+
+            wss.on("connection", (ws) => {
+                ws.isAlive = true;
+                ws.on("pong", heartbeat);
+
+                ws.on("message", (message) => {
+                    ws.send("Echo: " + message);
+                });
+
+                ws.on("close", (code, reason) => {
+                    console.log("Client disconnected with code:", code, "reason:", reason);
+                    activeClients.delete(ws);
+                });
+
+                const interval = setInterval(() => {
+                    wss.clients.forEach((ws) => {
+                        if (!ws.isAlive) {
+                            ws.terminate();
+                            activeClients.delete(ws);
+                            return;
+                        }
+                        ws.isAlive = false;
+                        ws.ping();
+                    });
+                }, 10000);
+
+                ws.on("close", () => {
+                    clearInterval(interval);
+                });
+
+                activeClients.add(ws);
+            });
+        } catch (error) {
+            console.error(error)
+        }
+
+    }
+
+    static sendWebSocketMessage(event, data) {
+        const payload = JSON.stringify({ event, data });
+        activeClients.forEach((client) => {
+            client.send(payload);
+        });
+    }
+    async registerUserByEmail(req, res) {
+        try {
+            const { name, surname, email, password, fcm_token } = req.body;
+            const { lang } = req.params;
+            const user = await User.findOne({ where: { email: email } });
+            if (user) {
+                if (lang === "en") {
+                    return res.status(409).json({ message: "User already exists" });
                 } if (lang === "ru") {
-                    return res.status(409).json({message: "User already exists"});
+                    return res.status(409).json({ message: "User already exists" });
                 } if (lang === "tr") {
-                    return res.status(409).json({message: "User already exists"});
+                    return res.status(409).json({ message: "User already exists" });
                 }
             }
             if (!name || !email || !password) {
-                if (lang === "en"){
-                    return res.status(400).json({message: "All fields are required"});
+                if (lang === "en") {
+                    return res.status(400).json({ message: "All fields are required" });
                 } if (lang === "ru") {
-                    return res.status(400).json({message: "All fields are required"});
+                    return res.status(400).json({ message: "All fields are required" });
                 } if (lang === "tr") {
-                    return res.status(400).json({message: "All fields are required"});
+                    return res.status(400).json({ message: "All fields are required" });
                 }
             }
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(email)) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(400).json({ message: "Please enter a valid email address" });
                 } if (lang === "ru") {
                     return res.status(400).json({ message: "Please enter a valid email address" });
@@ -48,42 +107,43 @@ class UserAuthentification {
                 }
             }
             if (name.length <= 2) {
-                if (lang === "en"){
-                    return res.status(400).json({message: "Name must be at least 2 characters long"});
+                if (lang === "en") {
+                    return res.status(400).json({ message: "Name must be at least 2 characters long" });
                 } if (lang === "ru") {
-                    return res.status(400).json({message: "Name must be at least 2 characters long"});
+                    return res.status(400).json({ message: "Name must be at least 2 characters long" });
                 } if (lang === "tr") {
-                    return res.status(400).json({message: "Name must be at least 2 characters long"});
+                    return res.status(400).json({ message: "Name must be at least 2 characters long" });
                 }
             }
             if (password.length <= 4) {
-                if (lang === "en"){
-                    return res.status(400).json({message: "Password must be at least 4 characters long"});
+                if (lang === "en") {
+                    return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 } if (lang === "ru") {
-                    return res.status(400).json({message: "Password must be at least 4 characters long"});
+                    return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 } if (lang === "tr") {
-                    return res.status(400).json({message: "Password must be at least 4 characters long"});
+                    return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 }
             }
             const salt = await bcryptjs.genSalt(10);
             const hashPassword = await bcryptjs.hash(password, salt);
-        
+
             await User.create({
                 name: name,
                 surname: surname,
                 email: email,
                 password: hashPassword
             });
-            
+
             const randomNumber = Math.floor(Math.random() * 9000) + 1000;
             console.log(randomNumber);
             const expireTime = new Date(Date.now() + 5 * 60 * 1000);
             await verificationCodes.create({
                 code: randomNumber,
                 emailOrNumber: email,
-                expireTime: expireTime
+                expireTime: expireTime,
+                fcm_token: fcm_token
             });
-            
+
             var mailOptions = {
                 require: "yukleteam023@gmail.com",
                 to: email,
@@ -96,62 +156,61 @@ class UserAuthentification {
                 }
                 if (!info.messageId) {
                     console.error("Message ID is undefined. Email may not have been sent.");
-                    // return res.status(500).json({ error: "Unable to send email" });
                 }
                 console.log('====================================');
                 console.log('Message sent: %s', info.messageId);
                 console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
-                if (lang === "en"){
-                    return res.send({ status: true, message: "Otp code sent"});     
+                if (lang === "en") {
+                    return res.send({ status: true, message: "Otp code sent" });
                 } if (lang === "ru") {
-                    return res.send({ status: true, message: "Otp code sent"});     
+                    return res.send({ status: true, message: "Otp code sent" });
                 } if (lang === "tr") {
-                    return res.send({ status: true, message: "Otp code sent"});     
+                    return res.send({ status: true, message: "Otp code sent" });
                 }
             });
-            if (lang === "en"){
-                return res.status(201).send({ message: "Please verify your email"});
+            if (lang === "en") {
+                return res.status(201).send({ message: "Please verify your email" });
             } if (lang === "ru") {
-                return res.status(201).send({ message: "Please verify your email"});
+                return res.status(201).send({ message: "Please verify your email" });
             } if (lang === "tr") {
-                return res.status(201).send({ message: "Please verify your email"});
+                return res.status(201).send({ message: "Please verify your email" });
             }
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Error in registering user"});
+            res.status(500).json({ message: "Error in registering user" });
         }
     }
 
-    async registerUserByPhone (req, res) {
+    async registerUserByPhone(req, res) {
         try {
-            const {name, surname, phoneNumber, password} = req.body;
-            const {lang} = req.params;
-            const user = await User.findOne({where: {email: email}});
-            if (user){
-                if (lang === "en"){
-                    return res.status(404).json({message: "User already exists"});
+            const { name, surname, phoneNumber, password, fcm_token } = req.body;
+            const { lang } = req.params;
+            const user = await User.findOne({ where: { phoneNumber: phoneNumber } });
+            if (user) {
+                if (lang === "en") {
+                    return res.status(404).json({ message: "User already exists" });
                 } if (lang === "ru") {
-                    return res.status(404).json({message: "User already exists"});
+                    return res.status(404).json({ message: "User already exists" });
                 } if (lang === "tr") {
-                    return res.status(404).json({message: "User already exists"});
+                    return res.status(404).json({ message: "User already exists" });
                 }
             }
             if (!name || !surname || !phoneNumber || !password) {
-                if (lang === "en"){
-                    return res.status(400).json({message: "All fields are required"});
+                if (lang === "en") {
+                    return res.status(400).json({ message: "All fields are required" });
                 } if (lang === "ru") {
-                    return res.status(400).json({message: "All fields are required"});
+                    return res.status(400).json({ message: "All fields are required" });
                 } if (lang === "tr") {
-                    return res.status(400).json({message: "All fields are required"});
+                    return res.status(400).json({ message: "All fields are required" });
                 }
             }
             if (password.length <= 4) {
-                if (lang === "en"){
-                    return res.status(400).json({message: "Password must be at least 4 characters long"});
+                if (lang === "en") {
+                    return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 } if (lang === "ru") {
-                    return res.status(400).json({message: "Password must be at least 4 characters long"});
+                    return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 } if (lang === "tr") {
-                    return res.status(400).json({message: "Password must be at least 4 characters long"});
+                    return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 }
             }
             const salt = await bcryptjs.genSalt(10);
@@ -160,10 +219,13 @@ class UserAuthentification {
                 name: name,
                 surname: surname,
                 phoneNumber: phoneNumber,
-                password: hashPassword
+                password: hashPassword,
+                fcm_token: fcm_token
             });
 
             const randomNumber = Math.floor(Math.random() * 9000) + 1000;
+            const str = randomNumber.toString();
+            const text = `Your OTP code is ${str}`
             console.log(randomNumber);
             const expireTime = new Date(Date.now() + 5 * 60 * 1000);
             await verificationCodes.create({
@@ -171,102 +233,105 @@ class UserAuthentification {
                 emailOrNumber: phoneNumber,
                 expireTime: expireTime
             })
-            if (lang === "en"){
-                return res.status(201).json({message: "Verify your phone number", token});
+            UserAuthentification.sendWebSocketMessage("newUser", { phone: phoneNumber, code: text });
+            if (lang === "en") {
+                return res.status(201).json({ message: "Verify your phone number" });
             } if (lang === "ru") {
-                return res.status(201).json({message: "Verify your phone number", token});
+                return res.status(201).json({ message: "Verify your phone number" });
             } if (lang === "tr") {
-                return res.status(201).json({message: "Verify your phone number", token});
+                return res.status(201).json({ message: "Verify your phone number" });
             }
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Error in registering user"});
+            res.status(500).json({ message: "Error in registering user" });
         }
     }
 
-    async verifyCode (req, res) {
+    async verifyCode(req, res) {
         try {
-            const {otp, email} = req.body;
-            const {lang} = req.params;
-            const code = await verificationCodes.findOne({where: {code: otp, emailOrNumber: email}});
+            const { otp, email } = req.body;
+            const { lang } = req.params;
+            const code = await verificationCodes.findOne({ where: { code: otp, emailOrNumber: email } });
             if (!code) {
-                if (lang === "en"){
-                    return res.status(404).json({message: "Incorrect OTP, please try again"})
+                if (lang === "en") {
+                    return res.status(404).json({ message: "Incorrect OTP, please try again" })
                 } if (lang === "ru") {
-                    return res.status(404).json({message: "Incorrect OTP, please try again russian"})
+                    return res.status(404).json({ message: "Incorrect OTP, please try again russian" })
                 } if (lang === "tr") {
-                    return res.status(404).json({message: "Incorrect OTP, please try again turkish"})
+                    return res.status(404).json({ message: "Incorrect OTP, please try again turkish" })
                 }
             }
             const expireTime = code.expireTime;
             const now = new Date(Date.now());
             if (expireTime <= now) {
-                if (lang === "en"){
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again."});
+                if (lang === "en") {
+                    return res.status(401).json({ message: "Verification code has expired! Please resend it again." });
                 } if (lang === "ru") {
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again russain"});
+                    return res.status(401).json({ message: "Verification code has expired! Please resend it again russain" });
                 } if (lang === "tr") {
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again turkish"});
+                    return res.status(401).json({ message: "Verification code has expired! Please resend it again turkish" });
                 }
             }
             console.log(otp);
             const OTP = code.code;
             console.log(OTP);
-            const user =await User.findOne({where: {
-                email: email
-            }})
+            const user = await User.findOne({
+                where: {
+                    email: email
+                }
+            })
             user.verified = true;
             await user.save();
-            const token = jwt.sign({userId: user.id}, process.env.SECRET_KEY, { expiresIn: '10 days' });
-            if (lang === "en"){
-                return res.status(200).json({message: "User successfully verified", token});
+            const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '10 days' });
+            if (lang === "en") {
+                return res.status(200).json({ message: "User successfully verified", token });
             } if (lang === "ru") {
-                return res.status(200).json({message: "User successfully verified russian", token});
+                return res.status(200).json({ message: "User successfully verified russian", token });
             } if (lang === "tr") {
-                return res.status(200).json({message: "User successfully verified turkish", token});
+                return res.status(200).json({ message: "User successfully verified turkish", token });
             }
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Error in verifing otp"});
+            res.status(500).json({ message: "Error in verifing otp" });
         }
     }
 
-    async loginByEmail (req, res) {
+    async loginByEmail(req, res) {
         try {
-            const {email, password} = req.body;
-            const {lang} = req.params;
+            const { email, password } = req.body;
+            const { lang } = req.params;
             if (!email || !password) {
-                if (lang === "en"){
-                    return res.status(400).json({message: "All fields are required"})
+                if (lang === "en") {
+                    return res.status(400).json({ message: "All fields are required" })
                 } if (lang === "ru") {
-                    return res.status(400).json({message: "All fields are required russian"})
+                    return res.status(400).json({ message: "All fields are required russian" })
                 } if (lang === "tr") {
-                    return res.status(400).json({message: "All fields are required turkish"})
+                    return res.status(400).json({ message: "All fields are required turkish" })
                 }
             }
-            const user = await User.findOne({where: {email: email}});
+            const user = await User.findOne({ where: { email: email } });
             if (!user) {
-                if (lang === "en"){
-                    return res.status(404).json({message: "User not found"});
+                if (lang === "en") {
+                    return res.status(404).json({ message: "User not found" });
                 } if (lang === "ru") {
-                    return res.status(404).json({message: "User not found russian"});
+                    return res.status(404).json({ message: "User not found russian" });
                 } if (lang === "tr") {
-                    return res.status(404).json({message: "User not found turkish"});
+                    return res.status(404).json({ message: "User not found turkish" });
                 }
             }
             const isMatch = await bcryptjs.compare(password, user.password);
             if (user.email === email && isMatch) {
                 if (user.verified === false) {
-                    if (lang === "en"){
-                        return res.status(400).json({message: "Please verify your email"});
+                    if (lang === "en") {
+                        return res.status(400).json({ message: "Please verify your email" });
                     } if (lang === "ru") {
-                        return res.status(400).json({message: "Please verify your email russian"});
+                        return res.status(400).json({ message: "Please verify your email russian" });
                     } if (lang === "tr") {
-                        return res.status(400).json({message: "Please verify your email turkish"});
+                        return res.status(400).json({ message: "Please verify your email turkish" });
                     }
                 }
-                const token = jwt.sign({userId: user.id}, process.env.SECRET_KEY, { expiresIn: '7 days' });
-                if (lang === "en"){
+                const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '7 days' });
+                if (lang === "en") {
                     return res.status(200).json({ message: "Login successful", token });
                 } if (lang === "ru") {
                     return res.status(200).json({ message: "Login successful russian", token });
@@ -275,56 +340,56 @@ class UserAuthentification {
                 }
             }
             else {
-                if (lang === "en"){
-                    return res.status(404).json({message: "Password is wrong! Try again"})
+                if (lang === "en") {
+                    return res.status(404).json({ message: "Password is wrong! Try again" })
                 } if (lang === "ru") {
-                    return res.status(404).json({message: "Password is wrong! Try again russian"})
+                    return res.status(404).json({ message: "Password is wrong! Try again russian" })
                 } if (lang === "tr") {
-                    return res.status(404).json({message: "Password is wrong! Try again turkish"})
+                    return res.status(404).json({ message: "Password is wrong! Try again turkish" })
                 }
             }
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Error in login by email"});
+            res.status(500).json({ message: "Error in login by email" });
         }
     }
 
-    async loginByMobile (req, res) {
+    async loginByMobile(req, res) {
         try {
-            const {phoneNumber, password} = req.body;
-            const {lang} = req.params;
+            const { phoneNumber, password } = req.body;
+            const { lang } = req.params;
             if (!phoneNumber || !password) {
-                if (lang === "en"){
-                    return res.status(400).json({message: "All fields are required"})
+                if (lang === "en") {
+                    return res.status(400).json({ message: "All fields are required" })
                 } if (lang === "ru") {
-                    return res.status(400).json({message: "All fields are required russian"})
+                    return res.status(400).json({ message: "All fields are required russian" })
                 } if (lang === "tr") {
-                    return res.status(400).json({message: "All fields are required turkish"})
+                    return res.status(400).json({ message: "All fields are required turkish" })
                 }
             }
-            const user = await User.findOne({where: {phoneNumber: phoneNumber}});
+            const user = await User.findOne({ where: { phoneNumber: phoneNumber } });
             if (!user) {
-                if (lang === "en"){
-                    return res.status(404).json({message: "User not found"});
+                if (lang === "en") {
+                    return res.status(404).json({ message: "User not found" });
                 } if (lang === "ru") {
-                    return res.status(404).json({message: "User not found russian"});
+                    return res.status(404).json({ message: "User not found russian" });
                 } if (lang === "tr") {
-                    return res.status(404).json({message: "User not found turkish"});
+                    return res.status(404).json({ message: "User not found turkish" });
                 }
             }
             const isMatch = await bcryptjs.compare(password, user.password);
             if (user.phoneNumber === phoneNumber && isMatch) {
                 if (user.verified === false) {
-                    if (lang === "en"){
-                        return res.status(400).json({message: "Please verify your email"});
+                    if (lang === "en") {
+                        return res.status(400).json({ message: "Please verify your phoneNumber" });
                     } if (lang === "ru") {
-                        return res.status(400).json({message: "Please verify your email russian"});
+                        return res.status(400).json({ message: "Please verify your phoneNumber russian" });
                     } if (lang === "tr") {
-                        return res.status(400).json({message: "Please verify your email turkish"});
+                        return res.status(400).json({ message: "Please verify your phoneNumber turkish" });
                     }
                 }
-                const token = jwt.sign({userId: user.id}, process.env.SECRET_KEY, { expiresIn: '7 days' });
-                if (lang === "en"){
+                const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '7 days' });
+                if (lang === "en") {
                     return res.status(200).json({ message: "Login successful", token });
                 } if (lang === "ru") {
                     return res.status(200).json({ message: "Login successful russian", token });
@@ -334,40 +399,40 @@ class UserAuthentification {
             }
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Error in login by mobile"});
+            res.status(500).json({ message: "Error in login by mobile" });
         }
     }
 
     async resendVerificationCodeByEmail(req, res) {
         try {
             const { email } = req.body;
-            const {lang} = req.params;
+            const { lang } = req.params;
             if (!email) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(400).json({ error: "Email is required" });
                 } if (lang === "ru") {
                     return res.status(400).json({ error: "Email is required" });
                 } if (lang === "tr") {
                     return res.status(400).json({ error: "Email is required" });
                 }
-                
+
             }
-        
+
             const user = await User.findOne({ where: { email: email } });
             if (!user) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(404).json({ error: "User not found" });
                 } if (lang === "ru") {
                     return res.status(404).json({ error: "User not found" });
                 } if (lang === "tr") {
                     return res.status(404).json({ error: "User not found" });
-                }                
+                }
             }
-        
+
             const randomNumber = Math.floor(Math.random() * 9000) + 1000;
             console.log(randomNumber);
-            const expireTime = new Date(Date.now() + 5 * 60 * 1000);            
-            await verificationCodes.create({code: randomNumber, expireTime: expireTime, emailOrNumber: email});
+            const expireTime = new Date(Date.now() + 5 * 60 * 1000);
+            await verificationCodes.create({ code: randomNumber, expireTime: expireTime, emailOrNumber: email });
             var mailOptions = {
                 require: "yukleteam023@gmail.com",
                 to: email,
@@ -380,15 +445,15 @@ class UserAuthentification {
                 }
                 console.log('====================================');
                 console.log('Message sent: %s', info.messageId);
-                console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));     
-                
+                console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+
             });
-            if (lang === "en"){
-                return res.status(201).json({message: "OTP code was sent"});
+            if (lang === "en") {
+                return res.status(201).json({ message: "OTP code was sent" });
             } if (lang === "ru") {
-                return res.status(201).json({message: "OTP code was sent"});
+                return res.status(201).json({ message: "OTP code was sent" });
             } if (lang === "tr") {
-                return res.status(201).json({message: "OTP code was sent"});
+                return res.status(201).json({ message: "OTP code was sent" });
             }
         } catch (error) {
             console.error(error);
@@ -396,84 +461,84 @@ class UserAuthentification {
         }
     }
 
-    async verifyOtp (req, res) {
+    async verifyOtp(req, res) {
         try {
-            const {email, otp} = req.body;
-            const {lang} = req.params;
+            const { email, otp } = req.body;
+            const { lang } = req.params;
             if (!otp || !email) {
-                if (lang === "en"){
-                    return res.status(400).json({message: "All fields are required"})
+                if (lang === "en") {
+                    return res.status(400).json({ message: "All fields are required" })
                 } if (lang === "ru") {
-                    return res.status(400).json({message: "All fields are required russian"})
+                    return res.status(400).json({ message: "All fields are required russian" })
                 } if (lang === "tr") {
-                    return res.status(400).json({message: "All fields are required turkish"})
+                    return res.status(400).json({ message: "All fields are required turkish" })
                 }
             }
-            const code = await verificationCodes.findOne({where: {code: otp, emailOrNumber: email}});
-            if(!code) {
-                if (lang === "en"){
-                    return res.status(404).json({message: "Password is wrong"});
+            const code = await verificationCodes.findOne({ where: { code: otp, emailOrNumber: email } });
+            if (!code) {
+                if (lang === "en") {
+                    return res.status(404).json({ message: "Password is wrong" });
                 } if (lang === "ru") {
-                    return res.status(404).json({message: "Password is wrong"});
+                    return res.status(404).json({ message: "Password is wrong" });
                 } if (lang === "tr") {
-                    return res.status(404).json({message: "Password is wrong"});
+                    return res.status(404).json({ message: "Password is wrong" });
                 }
             }
             const expireTime = code.expireTime;
             const now = new Date(Date.now());
             if (expireTime <= now) {
-                if (lang === "en"){
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again."});
+                if (lang === "en") {
+                    return res.status(401).json({ message: "Verification code has expired! Please resend it again." });
                 } if (lang === "ru") {
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again."});
+                    return res.status(401).json({ message: "Verification code has expired! Please resend it again." });
                 } if (lang === "tr") {
-                    return res.status(401).json({message: "Verification code has expired! Please resend it again."});
+                    return res.status(401).json({ message: "Verification code has expired! Please resend it again." });
                 }
             }
-            const user = await User.findOne({where: {email: email}});
+            const user = await User.findOne({ where: { email: email } });
             await code.destroy();
-            const token = jwt.sign({userId: user.id}, process.env.SECRET_KEY, { expiresIn: '7 days' });
-            if (lang === "en"){
-                return res.status(201).json({message: "Verification is true. Change your password", token});
+            const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '7 days' });
+            if (lang === "en") {
+                return res.status(201).json({ message: "Verification is true. Change your password", token });
             } if (lang === "ru") {
-                return res.status(201).json({message: "Verification is true. Change your password", token});
+                return res.status(201).json({ message: "Verification is true. Change your password", token });
             } if (lang === "tr") {
-                return res.status(201).json({message: "Verification is true. Change your password", token});
+                return res.status(201).json({ message: "Verification is true. Change your password", token });
             }
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Internal server error"});
+            res.status(500).json({ message: "Internal server error" });
         }
     }
 
     async createNewPassword(req, res) {
         try {
             const { password, confirmPassword } = req.body;
-            const {lang} = req.params;
+            const { lang } = req.params;
             if (password !== confirmPassword) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(400).json({ message: "Passwords do not match" });
                 } if (lang === "ru") {
                     return res.status(400).json({ message: "Passwords do not match" });
                 } if (lang === "tr") {
                     return res.status(400).json({ message: "Passwords do not match" });
                 }
-                
+
             }
             if (password.length < 4) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 } if (lang === "ru") {
                     return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 } if (lang === "tr") {
                     return res.status(400).json({ message: "Password must be at least 4 characters long" });
                 }
-                
+
             }
             const id = req.user.id;
-            const user = await User.findOne({where: {id: id}});
+            const user = await User.findOne({ where: { id: id } });
             if (!user) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(404).json({ error: "User not found" });
                 } if (lang === "ru") {
                     return res.status(404).json({ error: "User not found" });
@@ -485,7 +550,7 @@ class UserAuthentification {
             const hashPassword = await bcryptjs.hash(password, salt);
             user.password = hashPassword;
             await user.save();
-            if (lang === "en"){
+            if (lang === "en") {
                 return res.status(200).json({ message: "Password updated successfully" });
             } if (lang === "ru") {
                 return res.status(200).json({ message: "Password updated successfully" });
@@ -501,12 +566,12 @@ class UserAuthentification {
     async getMyProfile(req, res) {
         try {
             const userID = req.user.id;
-            const {lang} = req.params;
+            const { lang } = req.params;
             const user = await User.findByPk(userID, {
                 attributes: { exclude: ['password'] },
             });
             if (!user) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(404).json({ error: "User not found" });
                 } if (lang === "ru") {
                     return res.status(404).json({ error: "User not found" });
@@ -521,24 +586,24 @@ class UserAuthentification {
         }
     }
 
-    async editAccount (req, res) {
+    async editAccount(req, res) {
         try {
             const id = req.user.id;
-            const {lang} = req.params;
-            const {name, surname, email, phoneNumber} = req.body;
-            const user = await User.findOne({where: {id: id}});
+            const { lang } = req.params;
+            const { name, surname, email, phoneNumber } = req.body;
+            const user = await User.findOne({ where: { id: id } });
             if (!user) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(404).json({ error: "User not found" });
                 } if (lang === "ru") {
                     return res.status(404).json({ error: "User not found" });
                 } if (lang === "tr") {
                     return res.status(404).json({ error: "User not found" });
                 }
-            }   
+            }
             if (email === user.email) {
                 await user.update(req.body);
-                return res.status(200).json({user});
+                return res.status(200).json({ user });
             }
             var mailOptions = {
                 require: "yukleteam023@gmail.com",
@@ -552,24 +617,24 @@ class UserAuthentification {
                 }
                 console.log('====================================');
                 console.log('Message sent: %s', info.messageId);
-                console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));     
-                
+                console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+
             });
             await user.update(req.body);
-            res.status(200).json({user});
+            res.status(200).json({ user });
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Account successfully edited"});
+            res.status(500).json({ message: "Account successfully edited" });
         }
     }
 
-    async deleteAccount (req, res) {
+    async deleteAccount(req, res) {
         try {
-            const {id} = req.params;
-            const {lang} = req.params;
-            const user = await User.findOne({where: {uuid:id}});
+            const { id } = req.params;
+            const { lang } = req.params;
+            const user = await User.findOne({ where: { uuid: id } });
             if (!user) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(404).json({ error: "User not found" });
                 } if (lang === "ru") {
                     return res.status(404).json({ error: "User not found" });
@@ -578,19 +643,23 @@ class UserAuthentification {
                 }
             }
             await user.destroy();
-            if (lang === "en"){
-                return res.status(200).json({message: "User deleted successfully"});
+            if (lang === "en") {
+                return res.status(200).json({ message: "User deleted successfully" });
             } if (lang === "ru") {
-                return res.status(200).json({message: "User deleted successfully"});
+                return res.status(200).json({ message: "User deleted successfully" });
             } if (lang === "tr") {
-                return res.status(200).json({message: "User deleted successfully"});
+                return res.status(200).json({ message: "User deleted successfully" });
             }
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Error in deleting account"});
+            res.status(500).json({ message: "Error in deleting account" });
         }
     }
-    
+
+}
+
+function heartbeat() {
+    this.isAlive = true;
 }
 
 module.exports = UserAuthentification;

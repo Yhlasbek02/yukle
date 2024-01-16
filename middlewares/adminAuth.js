@@ -13,7 +13,7 @@ const checkAdminAuth = async (req, res, next) => {
                 attributes: { exclude: ['password'] },
             });
             if (!admin) {
-                res.send({message: "User not found"});
+                res.send({message: "Admin not found"});
             }
             req.admin = admin
             next();

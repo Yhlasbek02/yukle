@@ -1,6 +1,6 @@
-const { User, Cargo, CargoType, TransportType, country, city, Transport } = require("../../models/models");
+const { User, Cargo, CargoType, TransportType, country, city, Transport, Notifications } = require("../../models/models");
 const { Op } = require("sequelize");
-const messaging = require("../adminInitialize");
+const sendNotification = require("../adminInitialize");
 class CargoController {
     async getCargoTypes(req, res) {
         try {
@@ -29,7 +29,22 @@ class CargoController {
         }
     }
 
+    
+    
+
     async addCargo(req, res) {
+        async function sendNotificationsAfterResponse(tokens, uuid) {
+            const notificationPromises = tokens.map((token) =>
+                sendNotification(token, `cargo/${uuid}`, 'New cargo added')
+            );
+        
+            try {
+                await Promise.all(notificationPromises);
+                console.log("Notifications sent successfully");
+            } catch (error) {
+                console.error("Notification error:", error);
+            }
+        }
         try {
             const { lang } = req.params;
             const {
@@ -74,37 +89,40 @@ class CargoController {
                 userId: userId,
                 additional_info
             });
-            const transports = await Transport.findAll({ where: { belongsTo: fromCountry } });
-            const notificationPromises = [];
-            let tokens = []
+            const transports = await Transport.findAll({ where: { locationCountry: fromCountry } });
+            const notificationTokens = [];
+            const userIds = []
 
             for (const transport of transports) {
-                const user = await User.findByPk(transport.id);
-                if (user.cargoNotification === true && user.fcm_token) {
-                    if (!tokens.includes(user.fcm_token)) {
-                        tokens.push(user.fcm_token);
-                        const message = {
-                            notification: {
-                                title: 'New Cargo Available',
-                                body: 'A new cargo has been added.',
-                                imageUrl: req.body.imageUrl,
-                            },
-                            token: user.fcm_token,
-                        };
-                        notificationPromises.push(messaging.send(message));    
-                    }
-                    
+                const user = await User.findOne({ where: { id: transport.userId } });
+                console.log(user.dataValues);
+                if (user.fcm_token && user.cargoNotification && !notificationTokens.includes(user.fcm_token)) {
+                    userIds.push(user.id);
+                    notificationTokens.push(user.fcm_token);
+                    console.log("Added");
                 }
             }
-
-            await Promise.all(notificationPromises);
+            console.log(notificationTokens);
             if (lang === "en") {
-                return res.status(200).json({ message: "Cargo added successfully", newCargo });
-            } if (lang === "ru") {
-                return res.status(200).json({ message: "Груз успешно добавлен", newCargo });
-            } if (lang === "tr") {
-                return res.status(200).json({ message: "Yük başarıyla eklendi", newCargo });
+                res.status(200).json({ message: "Cargo added successfully", newCargo });
+            } else if (lang === "ru") {
+                res.status(200).json({ message: "Груз успешно добавлен", newCargo });
+            } else if (lang === "tr") {
+                res.status(200).json({ message: "Yük başarıyla eklendi", newCargo });
             }
+            try {
+                console.log("this is notification part");
+                const notification = await Notifications.create({
+                    userIds: userIds,
+                    body: "New Cargo",
+                    url: `cargo/${newCargo.uuid}`
+                })
+                console.log(notification);
+                await sendNotificationsAfterResponse(notificationTokens, `${newCargo.uuid}`);    
+            } catch (error) {
+                console.error(error);
+            }
+            
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Cargo adding error" })
@@ -129,7 +147,7 @@ class CargoController {
                 typeId: req.query.type,
                 fromCountry: req.query.from,
                 toCountry: req.query.to,
-                weight: { [Op.lt]: req.query.weight + 1 }
+                weight: { [Op.lte]: req.query.weight + 1 }
             };
 
             Object.keys(filters).forEach((key) => {
@@ -318,7 +336,7 @@ class CargoController {
                 ru: { exclude: ['nameEn', 'nameTr'] },
                 tr: { exclude: ['nameEn', 'nameRu'] },
             };
-            const cargo = await Cargo.findOne({ 
+            const cargo = await Cargo.findOne({
                 where: { uuid: id },
                 include: [
                     {
@@ -362,7 +380,7 @@ class CargoController {
                     return res.status(404).json({ message: "Cargos not found" });
                 }
             }
-            res.status(200).json({ cargo });            
+            res.status(200).json({ cargo });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Error in editing cargo" });

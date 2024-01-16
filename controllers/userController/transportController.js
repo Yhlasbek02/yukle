@@ -1,6 +1,6 @@
-const { User, Transport, TransportType, country, city, Cargo } = require("../../models/models");
+const { User, Transport, TransportType, country, city, Cargo, Notifications } = require("../../models/models");
 const { Op } = require("sequelize");
-const messaging = require("../adminInitialize");
+const sendNotification = require("../adminInitialize");
 
 class transportController {
     async getTransportTypes(req, res) {
@@ -11,16 +11,17 @@ class transportController {
                 ru: { exclude: ['nameEn', 'nameTr'] },
                 tr: { exclude: ['nameEn', 'nameRu'] },
             };
-            const types = await TransportType.findAll({
+            let types = await TransportType.findAll({
                 attributes: attributes[lang] || {}
             });
             if (!types || types.length === 0) {
+                types = []
                 if (lang === "en"){
-                    return res.status(404).json({ message: "Transport types not found" });
+                    return res.status(200).json({ types });
                 } if (lang === "ru") {
-                    return res.status(404).json({ message: "Transport types not found" });
+                    return res.status(200).json({ types });
                 } if (lang === "tr") {
-                    return res.status(404).json({ message: "Transport types not found" });
+                    return res.status(200).json({ types });
                 }
                 
             }
@@ -33,6 +34,18 @@ class transportController {
 
 
     async addTransport(req, res) {
+        async function sendNotificationsAfterResponse(tokens, uuid) {
+            const notificationPromises = tokens.map((token) =>
+                sendNotification(token, `transport/${uuid}`, 'New transport added')
+            );
+        
+            try {
+                await Promise.all(notificationPromises);
+                console.log("Notifications sent successfully");
+            } catch (error) {
+                console.error("Notification error:", error);
+            }
+        }
         try {
             const {lang} = req.params;
             const {
@@ -72,13 +85,38 @@ class transportController {
                 userId: userId,
                 additional_info
             });
+            const cargos = await Cargo.findAll({where: {fromCountry: locationCountry}})
+            const notificationTokens = [];
+            const userIds = []
+
+            for (const cargo of cargos) {
+                const user = await User.findOne({ where: { id: cargo.userId } });
+                console.log(user.dataValues);
+                if (user.fcm_token && user.transportNotification && !notificationTokens.includes(user.fcm_token)) {
+                    userIds.push(user.id);
+                    notificationTokens.push(user.fcm_token);
+                }
+            }
+
 
             if (lang === "en"){
-                return res.status(200).json({ message: "Transport added successfully", newTransport });
-            } if (lang === "ru") {
-                return res.status(200).json({ message: "Transport added successfully", newTransport });
-            } if (lang === "tr") {
-                return res.status(200).json({ message: "Transport added successfully", newTransport });
+                res.status(200).json({ message: "Transport added successfully", newTransport });
+            } else if (lang === "ru") {
+                res.status(200).json({ message: "Transport added successfully", newTransport });
+            } else if (lang === "tr") {
+                res.status(200).json({ message: "Transport added successfully", newTransport });
+            }
+            try {
+                console.log("this is notification part");
+                const notification = await Notifications.create({
+                    userIds: userIds,
+                    body: "New Transport",
+                    url: `transport/${newTransport.uuid}`
+                })
+                console.log(notification);
+                await sendNotificationsAfterResponse(notificationTokens, `${newTransport.uuid}`);    
+            } catch (error) {
+                console.error(error);
             }
         } catch (error) {
             console.error(error);
@@ -95,7 +133,7 @@ class transportController {
                 tr: { exclude: ['nameEn', 'nameRu'] },
             };
             const page = req.query.page || 1;
-            const pageSize = req.query.pageSize || 20;
+            const pageSize = req.query.pageSize || 12;
 
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';
@@ -166,7 +204,7 @@ class transportController {
             }
             if (transports.length === 0) {
                 transports = []
-                return res.status(404).json({ transports});
+                return res.status(200).json({ transports});
             };
             res.status(200).json({
                 transports,
@@ -189,7 +227,7 @@ class transportController {
                 tr: { exclude: ['nameEn', 'nameRu'] },
             };
             const page = req.query.page || 1;
-            const pageSize = req.query.pageSize || 20;
+            const pageSize = req.query.pageSize || 12;
 
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';
@@ -198,7 +236,7 @@ class transportController {
             const totalCount = await Transport.count({
                 where: {userId: id}
             });
-            const transport = await Transport.findAll({
+            let transports = await Transport.findAll({
                 offset,
                 limit: parseInt(pageSize),
                 order: [[sort, sortOrder]],
@@ -229,10 +267,9 @@ class transportController {
                         as: "location_city",
                         attributes: attributes[lang]
                     },
-
                 ]
             });
-            for (const single of transport) {
+            for (const single of transports) {
                 const desiredDirectionCountries = [];
                 for (const directionId of single.desiredDirection) {
                     const directionCountry = await country.findByPk(directionId);
@@ -242,17 +279,18 @@ class transportController {
                 }
                 single.desiredDirection = desiredDirectionCountries;
             }
-            if (transport.length === 0) {
+            if (transports.length === 0) {
+                transports = []
                 if (lang === "en"){
-                    return res.status(404).json({ message: "Transports not found" });
+                    return res.status(200).json({ transports });
                 } if (lang === "ru") {
-                    return res.status(404).json({ message: "Transports not found" });
+                    return res.status(200).json({ transports });
                 } if (lang === "tr") {
-                    return res.status(404).json({ message: "Transports not found" });
+                    return res.status(200).json({ transports });
                 }
             }
             res.status(200).json({
-                transport,
+                transports,
                 totalCount,
                 currentPage: page,
                 totalPages: Math.ceil(totalCount / pageSize) 
@@ -299,11 +337,11 @@ class transportController {
             });
             if (!transport) {
                 if (lang === "en"){
-                    return res.status(404).json({ message: "Cargo not found" });
+                    return res.status(404).json({ message: "Transport not found" });
                 } if (lang === "ru") {
-                    return res.status(404).json({ message: "Cargo not found" });
+                    return res.status(404).json({ message: "Transport not found" });
                 } if (lang === "tr") {
-                    return res.status(404).json({ message: "Cargo not found" });
+                    return res.status(404).json({ message: "Transport not found" });
                 }
                 
             }
@@ -321,11 +359,11 @@ class transportController {
             const transport = await Transport.findOne({ where: { uuid: id } });
             if (!transport) {
                 if (lang === "en"){
-                    return res.status(404).json({ message: "Cargo not found" });
+                    return res.status(404).json({ message: "Transport not found" });
                 } if (lang === "ru") {
-                    return res.status(404).json({ message: "Cargo not found" });
+                    return res.status(404).json({ message: "Transport not found" });
                 } if (lang === "tr") {
-                    return res.status(404).json({ message: "Cargo not found" });
+                    return res.status(404).json({ message: "Transport not found" });
                 }
             }
             await transport.destroy();
