@@ -4,7 +4,7 @@ class TransportController {
     async getTransports (req, res) {
         try {
             const page = req.query.page || 1;
-            const pageSize = req.query.pageSize || 15;
+            const pageSize = req.query.pageSize || 6;
     
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';

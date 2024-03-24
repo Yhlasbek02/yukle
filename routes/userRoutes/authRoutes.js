@@ -37,4 +37,5 @@ router.post("/verify-otp/:lang", UserAuth.verifyOtp);
 router.post("/change-pass/:lang", checkUserAuth, UserAuth.createNewPassword);
 router.get("/profile/:lang", checkUserAuth, UserAuth.getMyProfile);
 router.post("/change-account/:lang", checkUserAuth, UserAuth.editAccount);
+router.delete("/delete-account/:lang", checkUserAuth, UserAuth.deleteAccount);
 module.exports = router;

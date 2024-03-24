@@ -33,9 +33,9 @@ class CargoController {
     
 
     async addCargo(req, res) {
-        async function sendNotificationsAfterResponse(tokens, uuid) {
+        async function sendNotificationsAfterResponse(tokens, uuid, type) {
             const notificationPromises = tokens.map((token) =>
-                sendNotification(token, `cargo/${uuid}`, 'New cargo added')
+                sendNotification(token, `cargo/${uuid}`, 'New cargo added', `${uuid}`, type)
             );
         
             try {
@@ -89,20 +89,23 @@ class CargoController {
                 userId: userId,
                 additional_info
             });
-            const transports = await Transport.findAll({ where: { locationCountry: fromCountry } });
+            const transports = await Transport.findAll({ where: { locationCountry: fromCountry, userId: { [Op.ne]: userId } } });
+            console.log("transports:", transports);
             const notificationTokens = [];
             const userIds = []
 
             for (const transport of transports) {
-                const user = await User.findOne({ where: { id: transport.userId } });
-                console.log(user.dataValues);
+                const user = await User.findOne({ where: { id: transport.userId }});
+                console.log("user:", user.dataValues);
                 if (user.fcm_token && user.cargoNotification && !notificationTokens.includes(user.fcm_token)) {
                     userIds.push(user.id);
+                    console.log("fcm_token:", user.fcm_token)
                     notificationTokens.push(user.fcm_token);
                     console.log("Added");
+                } else {
+                    console.log(`${user.email} has no fcm_token`);
                 }
             }
-            console.log(notificationTokens);
             if (lang === "en") {
                 res.status(200).json({ message: "Cargo added successfully", newCargo });
             } else if (lang === "ru") {
@@ -115,10 +118,11 @@ class CargoController {
                 const notification = await Notifications.create({
                     userIds: userIds,
                     body: "New Cargo",
-                    url: `cargo/${newCargo.uuid}`
+                    url: `cargo/${newCargo.uuid}`,
+                    type: 'cargo'
                 })
-                console.log(notification);
-                await sendNotificationsAfterResponse(notificationTokens, `${newCargo.uuid}`);    
+                console.log("new notification:", notification);
+                await sendNotificationsAfterResponse(notificationTokens, `${newCargo.uuid}`, "cargo");    
             } catch (error) {
                 console.error(error);
             }
@@ -147,7 +151,7 @@ class CargoController {
                 typeId: req.query.type,
                 fromCountry: req.query.from,
                 toCountry: req.query.to,
-                weight: { [Op.lte]: req.query.weight + 1 }
+                weight: { [Op.lte]: parseInt(req.query.weight) }
             };
 
             Object.keys(filters).forEach((key) => {
@@ -330,7 +334,9 @@ class CargoController {
 
     async specificCargo(req, res) {
         try {
+            console.log(req.params);
             const { id, lang } = req.params;
+            console.log(id);
             const attributes = {
                 en: { exclude: ['nameRu', 'nameTr'] },
                 ru: { exclude: ['nameEn', 'nameTr'] },
@@ -371,6 +377,7 @@ class CargoController {
                     }
                 ]
             });
+            console.log(cargo.dataValues)
             if (!cargo) {
                 if (lang === "en") {
                     return res.status(404).json({ message: "Cargo not found" });

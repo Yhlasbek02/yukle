@@ -330,6 +330,10 @@ const Notifications = sequelize.define("Notification", {
     userIds: {
         type: DataTypes.ARRAY(DataTypes.INTEGER)
     },
+    type: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
     body: {
         type: DataTypes.STRING
     },

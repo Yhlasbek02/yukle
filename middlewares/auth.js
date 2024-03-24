@@ -8,6 +8,7 @@ const checkUserAuth = async (req, res, next) => {
       try {
           token = authorization.split(' ')[1]
           const {userId} = jwt.verify(token, process.env.SECRET_KEY);
+          console.log(userId)
           const user = await User.findOne({
               where: { id: userId },
               attributes: { exclude: ['password'] },

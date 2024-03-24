@@ -1,10 +1,10 @@
-const {User, Cargo, Transport} = require("../../models/models");
+const {User, Cargo, Transport, Message, adminMessage} = require("../../models/models");
 
 class UserController {
     async getAllUsers (req, res) {
         try {
             const page = req.query.page || 1;
-            const limit = req.query.pageSize || 8;
+            const limit = req.query.pageSize || 6;
             const offset = (parseInt(page) - 1) * parseInt(limit);
             const {searchKey} = req.query;
             let queryOptions = {
@@ -61,7 +61,8 @@ class UserController {
                 {
                     include: [
                         {model: Transport, as: 'transports'},
-                        {model: Cargo, as: 'cargos'}
+                        {model: Cargo, as: 'cargos'},
+                        {model: Message, as: "messages"}
                     ]
                 }
             );
@@ -72,6 +73,7 @@ class UserController {
 
             const transports = await Transport.findAll({where: {userId: user.id}});
             const cargos = await Cargo.findAll({where: {userId: user.id}});
+            const messages = await Message.findAll({where: {senderId: user.id}});
             console.log(transports, cargos);
             
             for (const transport of transports) {
@@ -79,6 +81,10 @@ class UserController {
             }
             for (const cargo of cargos) {
                 await cargo.destroy();
+            }
+            for (const message of messages) {
+                await adminMessage.destroy({where: {messageId: message.id}})
+                await message.destroy();
             }
             await user.destroy();
             return res.status(200).json({message: "User deleted"});

@@ -4,7 +4,7 @@ class CargoController {
     async getCargos (req, res) {
         try {
             const page = req.query.page || 1;
-            const pageSize = req.query.pageSize || 8;
+            const pageSize = req.query.pageSize || 6;
     
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';
@@ -48,7 +48,7 @@ class CargoController {
             res.status(200).json({
                 cargos,
                 totalCargos,
-                currentPage: page,
+                currentPage: parseInt(page),
                 totalPages: Math.ceil(totalCargos / pageSize)
             });
         } catch (error) {

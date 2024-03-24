@@ -1,5 +1,8 @@
 const Sequelize = require('sequelize');
-const config = require("./development");
-const sequelize = new Sequelize(config.development);
+
+const sequelize = new Sequelize('yukle', 'postgres', '0104', {
+  dialect: 'postgres',
+  host: 'localhost',
+});
 
 module.exports = sequelize;

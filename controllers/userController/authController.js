@@ -77,6 +77,7 @@ class UserAuthentification {
         try {
             const { name, surname, email, password, fcm_token } = req.body;
             const { lang } = req.params;
+            console.log(lang);
             const user = await User.findOne({ where: { email: email } });
             if (user) {
                 if (lang === "en") {
@@ -131,7 +132,8 @@ class UserAuthentification {
                 name: name,
                 surname: surname,
                 email: email,
-                password: hashPassword
+                password: hashPassword,
+                fcm_token: fcm_token
             });
 
             const randomNumber = Math.floor(Math.random() * 9000) + 1000;
@@ -140,8 +142,7 @@ class UserAuthentification {
             await verificationCodes.create({
                 code: randomNumber,
                 emailOrNumber: email,
-                expireTime: expireTime,
-                fcm_token: fcm_token
+                expireTime: expireTime
             });
 
             var mailOptions = {
@@ -183,9 +184,11 @@ class UserAuthentification {
 
     async registerUserByPhone(req, res) {
         try {
+            console.log(req.body)
             const { name, surname, phoneNumber, password, fcm_token } = req.body;
             const { lang } = req.params;
             const user = await User.findOne({ where: { phoneNumber: phoneNumber } });
+            console.log(user)
             if (user) {
                 if (lang === "en") {
                     return res.status(404).json({ message: "User already exists" });
@@ -222,6 +225,7 @@ class UserAuthentification {
                 password: hashPassword,
                 fcm_token: fcm_token
             });
+           
 
             const randomNumber = Math.floor(Math.random() * 9000) + 1000;
             const str = randomNumber.toString();
@@ -251,6 +255,7 @@ class UserAuthentification {
         try {
             const { otp, email } = req.body;
             const { lang } = req.params;
+            console.log(req.body);
             const code = await verificationCodes.findOne({ where: { code: otp, emailOrNumber: email } });
             if (!code) {
                 if (lang === "en") {
@@ -327,7 +332,9 @@ class UserAuthentification {
                 }
             }
             const isMatch = await bcryptjs.compare(password, user.password);
+            console.log(user);
             if (user.email === email && isMatch) {
+                console.log("statement")
                 if (user.verified === false) {
                     if (lang === "en") {
                         return res.status(400).json({ message: "Please verify your email" });
@@ -338,13 +345,16 @@ class UserAuthentification {
                     }
                 }
                 const token = jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '7 days' });
-                if (lang === "en") {
-                    return res.status(200).json({ message: "Login successful", token });
-                } if (lang === "ru") {
-                    return res.status(200).json({ message: "Login successful russian", token });
-                } if (lang === "tr") {
-                    return res.status(200).json({ message: "Login successful turkish", token });
-                }
+                console.log(token);
+                // if (lang === "en") {
+                //     console.log("english")
+                //     
+                // } if (lang === "ru") {
+                //     res.status(200).json({ message: "Login successful russian", token });
+                // } if (lang === "tr") {
+                //     res.status(200).json({ message: "Login successful turkish", token });
+                // }
+                res.status(200).json({ message: "Login successful", token });
             }
             else {
                 if (lang === "en") {
@@ -385,7 +395,8 @@ class UserAuthentification {
                 }
             }
             const isMatch = await bcryptjs.compare(password, user.password);
-            if (user.phoneNumber === phoneNumber && isMatch) {
+            console.log(isMatch);
+            if (isMatch) {
                 if (user.verified === false) {
                     if (lang === "en") {
                         return res.status(400).json({ message: "Please verify your email" });
@@ -464,6 +475,51 @@ class UserAuthentification {
                 console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
 
             });
+            if (lang === "en") {
+                return res.status(201).json({ message: "OTP code was sent" });
+            } if (lang === "ru") {
+                return res.status(201).json({ message: "OTP code was sent" });
+            } if (lang === "tr") {
+                return res.status(201).json({ message: "OTP code was sent" });
+            }
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: "Error resending verification code" });
+        }
+    }
+
+    async resendVerificationCodeByMobile(req, res) {
+        try {
+            const { phoneNumber } = req.body;
+            const { lang } = req.params;
+            if (!email) {
+                if (lang === "en") {
+                    return res.status(400).json({ error: "Email is required" });
+                } if (lang === "ru") {
+                    return res.status(400).json({ error: "Email is required" });
+                } if (lang === "tr") {
+                    return res.status(400).json({ error: "Email is required" });
+                }
+
+            }
+
+            const user = await User.findOne({ where: { phoneNumber } });
+            if (!user) {
+                if (lang === "en") {
+                    return res.status(404).json({ error: "User not found" });
+                } if (lang === "ru") {
+                    return res.status(404).json({ error: "User not found" });
+                } if (lang === "tr") {
+                    return res.status(404).json({ error: "User not found" });
+                }
+            }
+
+            const randomNumber = Math.floor(Math.random() * 9000) + 1000;
+            console.log(randomNumber);
+            const text = `Your verification code is ${str}`
+            const expireTime = new Date(Date.now() + 5 * 60 * 1000);
+            await verificationCodes.create({ code: randomNumber, expireTime: expireTime, emailOrNumber: email });
+            UserAuthentification.sendWebSocketMessage("newUser", { phone: phoneNumber, code: text });
             if (lang === "en") {
                 return res.status(201).json({ message: "OTP code was sent" });
             } if (lang === "ru") {
@@ -606,7 +662,6 @@ class UserAuthentification {
         try {
             const id = req.user.id;
             const { lang } = req.params;
-            const { name, surname, email, phoneNumber } = req.body;
             const user = await User.findOne({ where: { id: id } });
             if (!user) {
                 if (lang === "en") {
@@ -617,7 +672,7 @@ class UserAuthentification {
                     return res.status(404).json({ error: "User not found" });
                 }
             }
-            if (email === user.email) {
+            if (user) {
                 await user.update(req.body);
                 return res.status(200).json({ user });
             }
@@ -646,9 +701,8 @@ class UserAuthentification {
 
     async deleteAccount(req, res) {
         try {
-            const { id } = req.params;
             const { lang } = req.params;
-            const user = await User.findOne({ where: { uuid: id } });
+            const user = await User.findOne({ where: { id: req.user.id } });
             if (!user) {
                 if (lang === "en") {
                     return res.status(404).json({ error: "User not found" });

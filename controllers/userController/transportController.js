@@ -5,24 +5,20 @@ const sendNotification = require("../adminInitialize");
 class transportController {
     async getTransportTypes(req, res) {
         try {
+            console.log(req.params)
             const {lang} = req.params;
+            console.log(lang);
             const attributes = {
                 en: { exclude: ['nameRu', 'nameTr'] },
                 ru: { exclude: ['nameEn', 'nameTr'] },
                 tr: { exclude: ['nameEn', 'nameRu'] },
             };
-            let types = await TransportType.findAll({
+            const types = await TransportType.findAll({
                 attributes: attributes[lang] || {}
             });
+            console.log(types)
             if (!types || types.length === 0) {
-                types = []
-                if (lang === "en"){
-                    return res.status(200).json({ types });
-                } if (lang === "ru") {
-                    return res.status(200).json({ types });
-                } if (lang === "tr") {
-                    return res.status(200).json({ types });
-                }
+                return res.status(404).json({message: "Not found"})
                 
             }
             res.status(200).json({ types });
@@ -34,9 +30,9 @@ class transportController {
 
 
     async addTransport(req, res) {
-        async function sendNotificationsAfterResponse(tokens, uuid) {
+        async function sendNotificationsAfterResponse(tokens, uuid, type) {
             const notificationPromises = tokens.map((token) =>
-                sendNotification(token, `transport/${uuid}`, 'New transport added')
+                sendNotification(token, `transport/${uuid}`, 'New transport added', `${uuid}`, type)
             );
         
             try {
@@ -85,7 +81,7 @@ class transportController {
                 userId: userId,
                 additional_info
             });
-            const cargos = await Cargo.findAll({where: {fromCountry: locationCountry}})
+            const cargos = await Cargo.findAll({where: {fromCountry: locationCountry, userId: { [Op.ne]: userId}  }})
             const notificationTokens = [];
             const userIds = []
 
@@ -111,10 +107,11 @@ class transportController {
                 const notification = await Notifications.create({
                     userIds: userIds,
                     body: "New Transport",
-                    url: `transport/${newTransport.uuid}`
+                    url: `transport/${newTransport.uuid}`,
+                    type: 'transport'
                 })
-                console.log(notification);
-                await sendNotificationsAfterResponse(notificationTokens, `${newTransport.uuid}`);    
+                console.log("new notification:", notification);
+                await sendNotificationsAfterResponse(notificationTokens, `${newTransport.uuid}`, "transport");    
             } catch (error) {
                 console.error(error);
             }
@@ -142,10 +139,11 @@ class transportController {
                 typeId: req.query.type,
                 locationCountry: req.query.location,
                 belongsTo: req.query.country,
-                // desiredLocation: {
-                //     [Op.contains]: desiredLocation
-                // }
+                userId: {
+                    [Op.ne]: req.user.id
+                }
             };
+
 
             Object.keys(filters).forEach((key) => {
                 if (filters[key] === undefined || filters[key] === "") {
@@ -158,12 +156,7 @@ class transportController {
             let transports = await Transport.findAll({
                 offset,
                 limit: parseInt(pageSize),
-                where: {
-                    ...filters,
-                    userId: {
-                        [Op.ne]: req.user.id
-                    }
-                },
+                where: filters,
                 order: [[sort, sortOrder]],
                 include: [
                     {
@@ -197,7 +190,14 @@ class transportController {
                 for (const directionId of single.desiredDirection) {
                     const directionCountry = await country.findByPk(directionId);
                     if (directionCountry) {
-                        desiredDirectionCountries.push(directionCountry.nameEn);
+                        if (lang === "en") {
+                            desiredDirectionCountries.push(directionCountry.nameEn);
+                        } else if (lang === "ru") {
+                            desiredDirectionCountries.push(directionCountry.nameRu);
+                        } else {
+                            desiredDirectionCountries.push(directionCountry.nameTr);
+                        }
+                        
                     }
                 }
                 single.desiredDirection = desiredDirectionCountries;
@@ -206,6 +206,7 @@ class transportController {
                 transports = []
                 return res.status(200).json({ transports});
             };
+
             res.status(200).json({
                 transports,
                 totalCount,
@@ -303,7 +304,13 @@ class transportController {
 
     async specificTransport(req, res) {
         try {
+            console.log(req.params);
             const { id, lang } = req.params;
+            const attributes = {
+                en: { exclude: ['nameRu', 'nameTr'] },
+                ru: { exclude: ['nameEn', 'nameTr'] },
+                tr: { exclude: ['nameEn', 'nameRu'] },
+            };
             const transport = await Transport.findOne({ 
                 where: { uuid: id },
                 include: [
