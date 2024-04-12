@@ -714,7 +714,7 @@ class UserAuthentification {
             }
             await user.destroy();
             if (lang === "en") {
-                return res.status(200).json({ message: "User deleted successfully" });
+                return res.status(200).json({ message: "Account deleted successfully" });
             } if (lang === "ru") {
                 return res.status(200).json({ message: "User deleted successfully" });
             } if (lang === "tr") {

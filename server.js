@@ -1,4 +1,5 @@
 const express = require("express");
+const {exec} = require("child_process");
 const dotenv = require("dotenv");
 const sequelize = require('./config/config');
 const http = require("http");
@@ -27,6 +28,29 @@ app.use("/", country);
 app.all("*", (req, res, next) => {
   return res.status(404).json({message: `Can't find ${req.originalUrl} on this server`});
 });
+
+const backupDatabase = () => {
+  const dbName = 'yukle';
+  const backupFileName = `backup_${Date.now()}.sql`;
+
+  // Command to execute pg_dump utility
+  const command = `PGPASSWORD=0104 pg_dump -U postgres -h localhost -p 5432 -d ${dbName} > ${backupFileName}`;
+
+  // Execute the command
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`stderr: ${stderr}`);
+      return;
+    }
+    console.log(`Backup created successfully: ${backupFileName}`);
+  });
+};
+
+
 // async function deleteExpriredUsers() {
 //   const current_time = Date.now();
 //   try {
@@ -55,6 +79,7 @@ app.all("*", (req, res, next) => {
 
 const start = async () => {
   try {
+    backupDatabase();
     await sequelize.authenticate();
     await sequelize.sync({alter:true});
     server.listen(PORT, () => console.log(`server started on port ${PORT}`));
