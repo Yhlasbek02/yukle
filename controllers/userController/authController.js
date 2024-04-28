@@ -184,11 +184,9 @@ class UserAuthentification {
 
     async registerUserByPhone(req, res) {
         try {
-            console.log(req.body)
             const { name, surname, phoneNumber, password, fcm_token } = req.body;
             const { lang } = req.params;
             const user = await User.findOne({ where: { phoneNumber: phoneNumber } });
-            console.log(user)
             if (user) {
                 if (lang === "en") {
                     return res.status(404).json({ message: "User already exists" });
@@ -492,9 +490,9 @@ class UserAuthentification {
         try {
             const { phoneNumber } = req.body;
             const { lang } = req.params;
-            if (!email) {
+            if (!phoneNumber) {
                 if (lang === "en") {
-                    return res.status(400).json({ error: "Email is required" });
+                    return res.status(400).json({ error: "Phone is required" });
                 } if (lang === "ru") {
                     return res.status(400).json({ error: "Email is required" });
                 } if (lang === "tr") {
@@ -516,9 +514,9 @@ class UserAuthentification {
 
             const randomNumber = Math.floor(Math.random() * 9000) + 1000;
             console.log(randomNumber);
-            const text = `Your verification code is ${str}`
+            const text = `Your verification code is ${randomNumber}`
             const expireTime = new Date(Date.now() + 5 * 60 * 1000);
-            await verificationCodes.create({ code: randomNumber, expireTime: expireTime, emailOrNumber: email });
+            await verificationCodes.create({ code: randomNumber, expireTime: expireTime, emailOrNumber: phoneNumber });
             UserAuthentification.sendWebSocketMessage("newUser", { phone: phoneNumber, code: text });
             if (lang === "en") {
                 return res.status(201).json({ message: "OTP code was sent" });

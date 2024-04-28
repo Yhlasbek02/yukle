@@ -7,7 +7,7 @@ const JSON_FILE_PATH_ENG = path.join(__dirname, '../english.json');
 const file_rus = path.join(__dirname, '../rus.json');
 const file_tr = path.join(__dirname, "../tr.json");
 
-router.post('/countries/save/eng', async (req, res) => {
+router.post('/countries/save', async (req, res) => {
   try {
     const dataE = JSON.parse(fs.readFileSync(JSON_FILE_PATH_ENG, 'utf8'));
     const dataR = JSON.parse(fs.readFileSync(file_rus, 'utf8'));

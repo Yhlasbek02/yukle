@@ -33,6 +33,7 @@ router.post("/verify/:lang", UserAuth.verifyCode);
 router.post("/login/email/:lang", UserAuth.loginByEmail);
 router.post("/login/mobile/:lang", UserAuth.loginByMobile);
 router.post("/resend-code/email/:lang", UserAuth.resendVerificationCodeByEmail);
+router.post("/resend-code/mobile/:lang", UserAuth.resendVerificationCodeByMobile);
 router.post("/verify-otp/:lang", UserAuth.verifyOtp);
 router.post("/change-pass/:lang", checkUserAuth, UserAuth.createNewPassword);
 router.get("/profile/:lang", checkUserAuth, UserAuth.getMyProfile);
