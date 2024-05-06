@@ -79,7 +79,7 @@ const backupDatabase = () => {
 
 const start = async () => {
   try {
-    backupDatabase();
+    // backupDatabase();
     await sequelize.authenticate();
     await sequelize.sync({alter:true});
     server.listen(PORT, () => console.log(`server started on port ${PORT}`));

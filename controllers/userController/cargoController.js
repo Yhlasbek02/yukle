@@ -61,7 +61,7 @@ class CargoController {
                 whatsApp,
                 additional_info
             } = req.body;
-
+            
             if (!typeId || !fromCity || !fromCountry || !toCountry || !toCity || !weight || !name) {
                 if (!phoneNumber && !email) {
                     if (lang === "en") {
@@ -89,6 +89,7 @@ class CargoController {
                 userId: userId,
                 additional_info
             });
+            console.log(req.body);
             const transports = await Transport.findAll({ where: { locationCountry: fromCountry, userId: { [Op.ne]: userId } } });
             console.log("transports:", transports);
             const notificationTokens = [];
