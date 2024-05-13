@@ -149,6 +149,7 @@ class CargoController {
                 tr: { exclude: ['nameEn', 'nameRu'] },
             };
             const filters = {
+
                 typeId: req.query.type,
                 fromCountry: req.query.from,
                 toCountry: req.query.to,
@@ -160,8 +161,11 @@ class CargoController {
                     delete filters[key];
                 }
             });
-            const totalCount = await Cargo.count({
-                where: filters
+            const totalCount = await Cargo.count({where: {
+                ...filters,
+                userId: {
+                    [Op.ne]: req.user.id
+                }}
             });
             let cargos = await Cargo.findAll({
                 offset,
@@ -219,7 +223,6 @@ class CargoController {
                         }
                     }
                 }
-                console.log(transportTypes);
                 single.typeTransport = transportTypes;
             }
 
@@ -237,7 +240,7 @@ class CargoController {
             res.status(200).json({
                 cargos,
                 totalCount,
-                currentPage: page,
+                currentPage: parseInt(page),
                 totalPages: Math.ceil(totalCount / pageSize)
             });
         } catch (error) {
@@ -256,6 +259,9 @@ class CargoController {
             const sort = req.query.sort || 'createdAt';
             const sortOrder = req.query.order || 'ASC';
             const userId = req.user.id;
+            const totalCount = await Cargo.count({
+                where: {userId: userId}
+            });
             const attributes = {
                 en: { exclude: ['nameRu', 'nameTr'] },
                 ru: { exclude: ['nameEn', 'nameTr'] },
@@ -326,7 +332,7 @@ class CargoController {
                     return res.status(200).json({ cargos });
                 }
             }
-            res.status(200).json({ cargos });
+            res.status(200).json({ cargos, totalCount, currentPage: parseInt(page), totalPages: Math.ceil(totalCount / pageSize) });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Error in getting my cargos" });

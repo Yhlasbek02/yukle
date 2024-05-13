@@ -151,7 +151,7 @@ class transportController {
                 }
             });
             const totalCount = await Transport.count({
-                where: filters
+                where: {...filters, userId: {[Op.ne]: req.user.id}} 
             });
             let transports = await Transport.findAll({
                 offset,
@@ -204,13 +204,13 @@ class transportController {
             }
             if (transports.length === 0) {
                 transports = []
-                return res.status(200).json({ transports});
+                return res.status(200).json({ transports });
             };
 
             res.status(200).json({
                 transports,
                 totalCount,
-                currentPage: page,
+                currentPage: parseInt(page),
                 totalPages: Math.ceil(totalCount / pageSize)
             })
         } catch (error) {
@@ -293,7 +293,7 @@ class transportController {
             res.status(200).json({
                 transports,
                 totalCount,
-                currentPage: page,
+                currentPage: parseInt(page),
                 totalPages: Math.ceil(totalCount / pageSize) 
             });
         } catch (error) {
