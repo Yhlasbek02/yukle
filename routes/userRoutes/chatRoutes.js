@@ -3,8 +3,8 @@ const router = express.Router();
 const ChatController = require("../../controllers/userController/chatController");
 const controllers = new ChatController();
 
-router.post("/message/add", controllers.addMessage);
-router.get("/messages", controllers.getMessages);
+router.post("/message/add/:lang", controllers.addMessage);
+router.get("/messages/:lang", controllers.getMessages);
 
 
 

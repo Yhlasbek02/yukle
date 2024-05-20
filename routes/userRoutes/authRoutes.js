@@ -39,4 +39,5 @@ router.post("/change-pass/:lang", checkUserAuth, UserAuth.createNewPassword);
 router.get("/profile/:lang", checkUserAuth, UserAuth.getMyProfile);
 router.post("/change-account/:lang", checkUserAuth, UserAuth.editAccount);
 router.delete("/delete-account/:lang", checkUserAuth, UserAuth.deleteAccount);
+router.post("/change-notification/:type/:lang", checkUserAuth, UserAuth.changeNotification);
 module.exports = router;

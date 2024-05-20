@@ -1,5 +1,5 @@
 const { User, Notifications, Cargo, Transport, country, city, CargoType, TransportType } = require("../../models/models");
-const { Op, Sequelize } = require("sequelize")
+const { Op, Sequelize, where } = require("sequelize")
 
 class notificationController {
     async getNotifications(req, res) {
@@ -110,6 +110,111 @@ class notificationController {
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Server error" });
+        }
+    }
+
+    async getWebNotifications(req, res) {
+        try {
+            const {lang} = req.params;
+            const { type, page = 1, pageSize = 10, sort = 'createdAt', order = 'DESC' } = req.query;
+            const user = await User.findOne({ where: { id: req.user.id } });
+            const offset = (parseInt(page) - 1) * parseInt(pageSize);
+            const attributes = {
+                en: { exclude: ['nameRu', 'nameTr'] },
+                ru: { exclude: ['nameEn', 'nameTr'] },
+                tr: { exclude: ['nameEn', 'nameRu'] },
+            };
+            const whereClause = {
+                userIds: {
+                    [Op.contains]: [user.id]
+                }
+            };
+
+            if (type) {
+                whereClause.type = type;
+            }
+
+            const { count: totalCount, rows: notifications } = await Notifications.findAndCountAll({
+                where: whereClause,
+                order: [[sort, order]],
+                limit: parseInt(pageSize),
+                offset
+            });
+
+            // Fetch related Transport or Cargo based on notification type and URL
+            const detailedNotifications = await Promise.all(notifications.map(async (notification) => {
+                const uuid = notification.url.split('/').pop();
+                let relatedEntity = null;
+
+                if (notification.type === 'transport') {
+                    relatedEntity = await Transport.findOne({ 
+                        where: { uuid },
+                        include: [
+                            {
+                                model: TransportType,
+                                as: "type",
+                                attributes: attributes[lang]
+                            },
+                            {
+                                model: country,
+                                as: "affiliation_country",
+                                attributes: attributes[lang]
+                            },
+                            {
+                                model: country,
+                                as: "location_country",
+                                attributes: attributes[lang]
+                            },
+                            {
+                                model: city,
+                                as: "location_city",
+                                attributes: attributes[lang]
+                            },
+                        ] 
+                    });
+                } else if (notification.type === 'cargo') {
+                    relatedEntity = await Cargo.findOne({
+                        where: { uuid },
+                        include: [
+                            {
+                                model: CargoType,
+                                as: "type",
+                                attributes: attributes[lang]
+                            },
+                            {
+                                model: country,
+                                as: "from_country",
+                                attributes: attributes[lang]
+                            },
+                            {
+                                model: country,
+                                as: "to_country",
+                                attributes: attributes[lang]
+                            },
+                            {
+                                model: city,
+                                as: "from_city",
+                                attributes: attributes[lang]
+                            },
+                            {
+                                model: city,
+                                as: "to_city",
+                                attributes: attributes[lang]
+                            }
+                        ]
+                    });
+                }
+
+                return {
+                    ...notification.toJSON(), // Convert Sequelize instance to plain object
+                    relatedEntity
+                };
+            }));
+
+            res.status(200).json({ notifications: detailedNotifications, totalCount, currentPage: parseInt(page), totalPages: Math.ceil(totalCount / pageSize)});
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Server error' });
         }
     }
 

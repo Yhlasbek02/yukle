@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const WebSocket = require("ws");
 const EventEmitter = require("events");
+const { where } = require("sequelize");
 const MAX_LISTENERS = 20;
 EventEmitter.defaultMaxListeners = MAX_LISTENERS;
 
@@ -660,40 +661,83 @@ class UserAuthentification {
         try {
             const id = req.user.id;
             const { lang } = req.params;
-            const user = await User.findOne({ where: { id: id } });
+            const { name, surname, phoneNumber, email } = req.body;
+            console.log(req.body)
+            const user = await User.findOne({ where: { id } });
             if (!user) {
-                if (lang === "en") {
-                    return res.status(404).json({ error: "User not found" });
-                } if (lang === "ru") {
-                    return res.status(404).json({ error: "User not found" });
-                } if (lang === "tr") {
-                    return res.status(404).json({ error: "User not found" });
-                }
+                const errorMessages = {
+                    en: "User not found",
+                    ru: "Пользователь не найден",
+                    tr: "Kullanıcı bulunamadı"
+                };
+                return res.status(404).json({ message: errorMessages[lang] || errorMessages.en });
             }
-            if (user) {
-                await user.update(req.body);
-                return res.status(200).json({ user });
+    
+            if (!name || !phoneNumber || !email) {
+                const errorMessages = {
+                    en: "All fields are required",
+                    ru: "Все поля обязательны для заполнения",
+                    tr: "Tüm alanlar gereklidir"
+                };
+                return res.status(400).json({ message: errorMessages[lang] || errorMessages.en });
             }
-            var mailOptions = {
-                require: "yukleteam023@gmail.com",
-                to: user.email,
-                subject: "Email changed",
-                html: "Your email changed"
-            };
-            transporter.sendMail(mailOptions, (error, info) => {
-                if (error) {
-                    console.error(error);
-                }
-                console.log('====================================');
-                console.log('Message sent: %s', info.messageId);
-                console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    
+            const updateFields = { name, surname, phoneNumber, email };
+            await user.update(updateFields);
+    
+            if (email !== user.email) {
+                const mailOptions = {
+                    from: "yukleteam023@gmail.com",
+                    to: email,
+                    subject: "Email changed",
+                    html: "Your email has been changed"
+                };
+    
+                transporter.sendMail(mailOptions, (error, info) => {
+                    if (error) {
+                        console.error("Error sending email:", error);
+                    } else {
+                        console.log('Message sent:', info.messageId);
+                        console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+                    }
+                });
+            }
+    
+            res.status(200).json({ user, message: "Account edited successfully"});
+        } catch (error) {
+            console.error("Error editing account:", error);
+            res.status(500).json({ message: "An error occurred while editing the account" });
+        }
+    }
+    
 
-            });
-            await user.update(req.body);
-            res.status(200).json({ user });
+    async changeNotification(req, res) {
+        try {
+            const {type} = req.params;
+            const user = await User.findOne({where: {id: req.user.id}});
+            if (type === "transport") {
+                const transport = user.transportNotification;
+                if (transport) {
+                    user.transportNotification = false;
+                    await user.save();
+                } else {
+                    user.transportNotification = true;
+                    await user.save();
+                }
+            } else if (type === "cargo") {
+                const cargo = user.cargoNotification;
+                if (cargo) {
+                    user.cargoNotification = false;
+                    await user.save()
+                } else {
+                    user.cargoNotification = true;
+                    await user.save();
+                }
+            }
+            res.status(200).json({message: "Successfully updated"});
         } catch (error) {
             console.error(error);
-            res.status(500).json({ message: "Account successfully edited" });
+            res.status(500).json({message: "Server error"});
         }
     }
 

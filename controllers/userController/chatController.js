@@ -1,25 +1,41 @@
-const {Message, adminMessage} = require("../../models/models");
+const { Message, adminMessage } = require("../../models/models");
 
 class ChatController {
     async addMessage(req, res) {
         try {
-            const {text} = req.body;
+            const { text } = req.body;
+            const { lang } = req.query;
+            if (!text) {
+                if (lang === "en") {
+                    return res.status(400).json({ message: "Field is required" });
+                } else if (lang === "ru") {
+                    return res.status(400).json({ message: "Field is required russian" });
+                } else {
+                    return res.status(400).json({ message: "Message sent successfully turkish" });
+                }
+            }
             const newMessage = await Message.create({
                 text: text,
                 senderId: req.user.id
             });
-            res.status(200).json({message: "Message sent successfully", newMessage});
+            if (lang === "en") {
+                return res.status(200).json({ message: "Message sent successfully", newMessage });
+            } else if (lang === "ru") {
+                return res.status(200).json({ message: "Message sent successfully", newMessage });
+            } else {
+                return res.status(200).json({ message: "Message sent successfully", newMessage });
+            }
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Error in add message"});
+            res.status(500).json({ message: "Error in add message" });
         }
     }
 
-    async getMessages (req, res) {
+    async getMessages(req, res) {
         try {
             const id = req.user.id;
             let messages = await Message.findAll({
-                where: {senderId: id},
+                where: { senderId: id },
                 include: [
                     {
                         model: adminMessage,
@@ -27,10 +43,10 @@ class ChatController {
                     }
                 ]
             }) || [];
-            res.status(200).json({messages});
+            res.status(200).json({ messages });
         } catch (error) {
             console.error(error);
-            res.status(500).json({message: "Error in getting messages"});
+            res.status(500).json({ message: "Error in getting messages" });
         }
     }
 }
