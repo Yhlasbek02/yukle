@@ -1,25 +1,24 @@
 const { User, Transport, TransportType, country, city, Cargo, Notifications } = require("../../models/models");
-const { Op } = require("sequelize");
+const { Op, Sequelize } = require("sequelize");
 const sendNotification = require("../adminInitialize");
 
 class transportController {
     async getTransportTypes(req, res) {
         try {
-            console.log(req.params)
-            const {lang} = req.params;
+            const { lang } = req.params;
             console.log(lang);
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
             const types = await TransportType.findAll({
                 attributes: attributes[lang] || {}
             });
             console.log(types)
             if (!types || types.length === 0) {
-                return res.status(404).json({message: "Not found"})
-                
+                return res.status(404).json({ message: "Not found" })
+
             }
             res.status(200).json({ types });
         } catch (error) {
@@ -34,7 +33,7 @@ class transportController {
             const notificationPromises = tokens.map((token) =>
                 sendNotification(token, `transport/${uuid}`, 'New transport added', `${uuid}`, type)
             );
-        
+
             try {
                 await Promise.all(notificationPromises);
                 console.log("Notifications sent successfully");
@@ -43,7 +42,7 @@ class transportController {
             }
         }
         try {
-            const {lang} = req.params;
+            const { lang } = req.params;
             const {
                 typeId,
                 belongsTo,
@@ -55,10 +54,10 @@ class transportController {
                 desiredDirection,
                 whatsApp,
                 additional_info
-             } = req.body; 
+            } = req.body;
             if (!typeId || !belongsTo || !locationCountry || !name) {
                 if (!phoneNumber && !email) {
-                    if (lang === "en"){
+                    if (lang === "en") {
                         return res.status(404).json({ message: "Fields are required" });
                     } if (lang === "ru") {
                         return res.status(404).json({ message: "Fields are required" });
@@ -81,7 +80,7 @@ class transportController {
                 userId: userId,
                 additional_info
             });
-            const cargos = await Cargo.findAll({where: {fromCountry: locationCountry, userId: { [Op.ne]: userId}  }})
+            const cargos = await Cargo.findAll({ where: { fromCountry: locationCountry, userId: { [Op.ne]: userId } } })
             const notificationTokens = [];
             const userIds = []
 
@@ -95,7 +94,7 @@ class transportController {
             }
 
 
-            if (lang === "en"){
+            if (lang === "en") {
                 res.status(200).json({ message: "Transport added successfully", newTransport });
             } else if (lang === "ru") {
                 res.status(200).json({ message: "Transport added successfully", newTransport });
@@ -111,7 +110,7 @@ class transportController {
                     type: 'transport'
                 })
                 console.log("new notification:", notification);
-                await sendNotificationsAfterResponse(notificationTokens, `${newTransport.uuid}`, "transport");    
+                await sendNotificationsAfterResponse(notificationTokens, `${newTransport.uuid}`, "transport");
             } catch (error) {
                 console.error(error);
             }
@@ -123,11 +122,11 @@ class transportController {
 
     async getTransports(req, res) {
         try {
-            const {lang} = req.params;
+            const { lang } = req.params;
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
             const page = req.query.page || 1;
             const pageSize = req.query.pageSize || 12;
@@ -151,7 +150,7 @@ class transportController {
                 }
             });
             const totalCount = await Transport.count({
-                where: {...filters, userId: {[Op.ne]: req.user.id}} 
+                where: { ...filters, userId: { [Op.ne]: req.user.id } }
             });
             let transports = await Transport.findAll({
                 offset,
@@ -161,7 +160,8 @@ class transportController {
                 include: [
                     {
                         model: User,
-                        as: "user"
+                        as: "user",
+                        attributes: ['name', 'surname', 'email', 'phoneNumber']
                     },
                     {
                         model: TransportType,
@@ -197,7 +197,7 @@ class transportController {
                         } else {
                             desiredDirectionCountries.push(directionCountry.nameTr);
                         }
-                        
+
                     }
                 }
                 single.desiredDirection = desiredDirectionCountries;
@@ -221,11 +221,11 @@ class transportController {
 
     async myTransport(req, res) {
         try {
-            const {lang} = req.params;
+            const { lang } = req.params;
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
             const page = req.query.page || 1;
             const pageSize = req.query.pageSize || 12;
@@ -235,7 +235,7 @@ class transportController {
             const sortOrder = req.query.order || 'ASC';
             const id = req.user.id;
             const totalCount = await Transport.count({
-                where: {userId: id}
+                where: { userId: id }
             });
             let transports = await Transport.findAll({
                 offset,
@@ -243,11 +243,6 @@ class transportController {
                 order: [[sort, sortOrder]],
                 where: { userId: id },
                 include: [
-                    {
-                        model: User,
-                        as: "user",
-                        attributes: {exclude: ['password']}
-                    },
                     {
                         model: TransportType,
                         as: "type",
@@ -282,7 +277,7 @@ class transportController {
             }
             if (transports.length === 0) {
                 transports = []
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(200).json({ transports });
                 } if (lang === "ru") {
                     return res.status(200).json({ transports });
@@ -294,7 +289,7 @@ class transportController {
                 transports,
                 totalCount,
                 currentPage: parseInt(page),
-                totalPages: Math.ceil(totalCount / pageSize) 
+                totalPages: Math.ceil(totalCount / pageSize)
             });
         } catch (error) {
             console.error(error);
@@ -307,17 +302,17 @@ class transportController {
             console.log(req.params);
             const { id, lang } = req.params;
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
-            const transport = await Transport.findOne({ 
+            const transport = await Transport.findOne({
                 where: { uuid: id },
                 include: [
                     {
                         model: User,
                         as: "user",
-                        attributes: {exclude: ['password']}
+                        attributes: ['name', 'surname', 'email', 'phoneNumber']
                     },
                     {
                         model: TransportType,
@@ -343,16 +338,16 @@ class transportController {
                 ]
             });
             if (!transport) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(404).json({ message: "Transport not found" });
                 } if (lang === "ru") {
                     return res.status(404).json({ message: "Transport not found" });
                 } if (lang === "tr") {
                     return res.status(404).json({ message: "Transport not found" });
                 }
-                
+
             }
-            
+
             res.status(200).json({ transport });
         } catch (error) {
             console.error(error);
@@ -365,7 +360,7 @@ class transportController {
             const { id, lang } = req.params;
             const transport = await Transport.findOne({ where: { uuid: id } });
             if (!transport) {
-                if (lang === "en"){
+                if (lang === "en") {
                     return res.status(404).json({ message: "Transport not found" });
                 } if (lang === "ru") {
                     return res.status(404).json({ message: "Transport not found" });
@@ -374,14 +369,14 @@ class transportController {
                 }
             }
             await transport.destroy();
-            if (lang === "en"){
+            if (lang === "en") {
                 return res.status(200).json({ message: "Transport deleted successfully" });
             } if (lang === "ru") {
                 return res.status(200).json({ message: "Transport deleted successfully" });
             } if (lang === "tr") {
                 return res.status(200).json({ message: "Transport deleted successfully" });
             }
-            
+
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Error in deleting transport" });

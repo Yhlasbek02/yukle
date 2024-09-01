@@ -35,7 +35,8 @@ class chatController {
                 include: [
                     {
                         model: User,
-                        as: 'sender'
+                        as: 'sender',
+                        attributes: ['name', 'surname', 'email', 'phoneNumber']
                     }
                 ]
             });

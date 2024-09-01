@@ -30,9 +30,9 @@ class notificationController {
             // Fetch cargo or transport information for each notification
             for (const notification of notifications) {
                 const attributes = {
-                    en: { exclude: ['nameRu', 'nameTr', 'id', 'uuid', 'createdAt', 'updatedAt'] },
-                    ru: { exclude: ['nameEn', 'nameTr', 'id', 'uuid', 'createdAt', 'updatedAt'] },
-                    tr: { exclude: ['nameEn', 'nameRu', 'id', 'uuid', 'createdAt', 'updatedAt'] },
+                    en: [[Sequelize.col('nameEn'), 'name']],
+                    ru: [[Sequelize.col('nameRu'), 'name']],
+                    tr: [[Sequelize.col('nameTr'), 'name']],
                 };
                 const uuid = notification.url.split('/')[1];
                 const entityType = notification.url.split('/')[0]; // Extracting whether it's cargo or transport
@@ -115,14 +115,14 @@ class notificationController {
 
     async getWebNotifications(req, res) {
         try {
-            const {lang} = req.params;
+            const { lang } = req.params;
             const { type, page = 1, pageSize = 10, sort = 'createdAt', order = 'DESC' } = req.query;
             const user = await User.findOne({ where: { id: req.user.id } });
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
             const whereClause = {
                 userIds: {
@@ -147,7 +147,7 @@ class notificationController {
                 let relatedEntity = null;
 
                 if (notification.type === 'transport') {
-                    relatedEntity = await Transport.findOne({ 
+                    relatedEntity = await Transport.findOne({
                         where: { uuid },
                         include: [
                             {
@@ -170,7 +170,7 @@ class notificationController {
                                 as: "location_city",
                                 attributes: attributes[lang]
                             },
-                        ] 
+                        ]
                     });
                 } else if (notification.type === 'cargo') {
                     relatedEntity = await Cargo.findOne({
@@ -211,7 +211,7 @@ class notificationController {
                 };
             }));
 
-            res.status(200).json({ notifications: detailedNotifications, totalCount, currentPage: parseInt(page), totalPages: Math.ceil(totalCount / pageSize)});
+            res.status(200).json({ notifications: detailedNotifications, totalCount, currentPage: parseInt(page), totalPages: Math.ceil(totalCount / pageSize) });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: 'Server error' });

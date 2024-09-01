@@ -1,5 +1,5 @@
 const { country, city } = require("../../models/models");
-const { Op } = require("sequelize");
+const { Op, Sequelize } = require("sequelize");
 class countryController {
     async getCountries(req, res) {
         function toCamelCase(name) {
@@ -25,9 +25,9 @@ class countryController {
 
 
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
 
             const countries = await country.findAll({
@@ -83,9 +83,9 @@ class countryController {
             }
 
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
 
             let cities = await city.findAll({ where: whereClauses, attributes: attributes[lang] || {} });

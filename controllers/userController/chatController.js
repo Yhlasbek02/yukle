@@ -7,11 +7,11 @@ class ChatController {
             const { lang } = req.query;
             if (!text) {
                 if (lang === "en") {
-                    return res.status(400).json({ message: "Field is required" });
+                    return res.status(404).json({ message: "Field is required" });
                 } else if (lang === "ru") {
-                    return res.status(400).json({ message: "Field is required russian" });
+                    return res.status(404).json({ message: "Field is required russian" });
                 } else {
-                    return res.status(400).json({ message: "Message sent successfully turkish" });
+                    return res.status(404).json({ message: "Field is required" });
                 }
             }
             const newMessage = await Message.create({

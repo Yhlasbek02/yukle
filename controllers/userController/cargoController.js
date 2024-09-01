@@ -1,14 +1,14 @@
 const { User, Cargo, CargoType, TransportType, country, city, Transport, Notifications } = require("../../models/models");
-const { Op } = require("sequelize");
+const { Op, Sequelize } = require("sequelize");
 const sendNotification = require("../adminInitialize");
 class CargoController {
     async getCargoTypes(req, res) {
         try {
             const { lang } = req.params;
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
             const types = await CargoType.findAll({
                 attributes: attributes[lang] || {}
@@ -144,9 +144,9 @@ class CargoController {
             const sort = req.query.sort || 'createdAt';
             const sortOrder = req.query.order || 'ASC';
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
             const filters = {
 
@@ -180,7 +180,8 @@ class CargoController {
                 include: [
                     {
                         model: User,
-                        as: "user"
+                        as: "user",
+                        attributes: ['name', 'surname', 'email', 'phoneNumber']
                     },
                     {
                         model: CargoType,
@@ -263,9 +264,9 @@ class CargoController {
                 where: {userId: userId}
             });
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
             let cargos = await Cargo.findAll({
                 offset,
@@ -273,11 +274,6 @@ class CargoController {
                 order: [[sort, sortOrder]],
                 where: { userId: userId },
                 include: [
-                    {
-                        model: User,
-                        as: "user",
-                        attributes: attributes[lang]
-                    },
                     {
                         model: CargoType,
                         as: "type",
@@ -345,9 +341,9 @@ class CargoController {
             const { id, lang } = req.params;
             console.log(id);
             const attributes = {
-                en: { exclude: ['nameRu', 'nameTr'] },
-                ru: { exclude: ['nameEn', 'nameTr'] },
-                tr: { exclude: ['nameEn', 'nameRu'] },
+                en: [[Sequelize.col('nameEn'), 'name']],
+                ru: [[Sequelize.col('nameRu'), 'name']],
+                tr: [[Sequelize.col('nameTr'), 'name']],
             };
             const cargo = await Cargo.findOne({
                 where: { uuid: id },
@@ -355,7 +351,7 @@ class CargoController {
                     {
                         model: User,
                         as: "user",
-                        attributes: attributes[lang]
+                        attributes: ['name', 'surname', 'email', 'phoneNumber']
                     },
                     {
                         model: CargoType,
