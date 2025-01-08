@@ -3,8 +3,8 @@ const {CargoType} = require("../../models/models");
 class CargoTypeController {
     async addCargoType (req, res) {
         try {
-            const {nameEn, nameRu, nameTr} = req.body;
-            const cargoType = await CargoType.create({nameEn, nameRu, nameTr});
+            const {nameEn, nameRu, nameTr, nameTm} = req.body;
+            const cargoType = await CargoType.create({nameEn, nameRu, nameTr, nameTm});
             res.status(200).json({message: "Cargo type added sucessfully", cargoType});
         } catch (error) {
             console.error(error);
@@ -15,7 +15,7 @@ class CargoTypeController {
     async editCargoType ( req, res) {
         try {
             const {id} = req.params;
-            const {nameEn, nameRu, nameTr} = req.body;
+            const {nameEn, nameRu, nameTr, nameTm} = req.body;
             const cargoType = await CargoType.findOne({where: {uuid: id}});
             if (!cargoType) {
                 return res.status(404).json({message: "Cargo type not found"});
@@ -23,6 +23,7 @@ class CargoTypeController {
             cargoType.nameEn = nameEn;
             cargoType.nameRu = nameRu;
             cargoType.nameTr = nameTr;
+            cargoType.nameTm = nameTm;
             await cargoType.save();
             res.status(200).json({message: "Cargo type successfully edited", cargoType});
         } catch (error) {

@@ -4,6 +4,7 @@ const CargoController = require("../../controllers/userController/cargoControlle
 const controllers = new CargoController();
 
 router.get("/get-types/:lang", controllers.getCargoTypes);
+router.get("/get-dangerous-types/:lang", controllers.getDangerousTypes);
 router.post("/add/:lang", controllers.addCargo);
 router.get("/:lang", controllers.getCargos);
 router.get("/my/:lang", controllers.getMyCargos);

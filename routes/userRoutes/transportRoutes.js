@@ -4,6 +4,7 @@ const transportController = require("../../controllers/userController/transportC
 const controllers = new transportController();
 
 router.get("/get-types/:lang", controllers.getTransportTypes);
+router.get("/get-transportation-types/:lang", controllers.getTransportationType);
 router.post("/add/:lang", controllers.addTransport);
 router.get("/:lang", controllers.getTransports);
 router.get("/my/:lang", controllers.myTransport);

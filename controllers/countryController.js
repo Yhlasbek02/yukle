@@ -21,7 +21,8 @@ router.post('/countries/save', async (req, res) => {
         countryInstance = await country.create({
           nameEn: english_data.countryName,
           nameRu: rus_data.countryName,
-          nameTr: tr_data.countryName
+          nameTr: tr_data.countryName,
+          nameTm: tr_data.countryName
         });
         const cityAmount = english_data.cities.length;
         const cityAmount1 = rus_data.cities.length;
@@ -36,6 +37,7 @@ router.post('/countries/save', async (req, res) => {
               nameEn: english_data.cities[i],
               nameRu: rus_data.cities[i],
               nameTr: tr_data.cities[i],
+              nameTm: tr_data.cities[i],
               countryId: countryInstance.id
             })
           }
@@ -72,6 +74,21 @@ router.post('/countries/add-empty-city', async (req, res) => {
   }
 })
 
+
+router.post('/turkmen-countries', async (req, res) => {
+  try {
+    const countries = await country.findAll();
+    for (const country of countries) {
+      country.nameTm = country.nameTr;
+      await country.save();
+    }
+
+    res.status(200).json({message: "Success"})
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({message: "Error in getting add city"});
+  }
+})
 // router.post('/countries/save/ru', async (req, res) => {
 //   try {
 //     const countryCount = await country.count();

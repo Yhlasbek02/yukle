@@ -3,11 +3,11 @@ const {TransportType} = require("../../models/models");
 class TransportTypeController {
     async addTransportType (req, res) {
         try {
-            const {nameEn, nameRu, nameTr} = req.body;
-            if (!nameEn || !nameRu || !nameTr) {
+            const {nameEn, nameRu, nameTr, nameTm} = req.body;
+            if (!nameEn || !nameRu || !nameTr || !nameTm) {
                 return res.status(400).json({message: "All fields are required"});
             }
-            const newTransportType = await TransportType.create({nameEn, nameRu, nameTr});
+            const newTransportType = await TransportType.create({nameEn, nameRu, nameTr, nameTm});
             res.status(200).json({message: "Transport type added", newTransportType});
         } catch (error) {
             console.error(error);
@@ -18,7 +18,7 @@ class TransportTypeController {
     async editTransportType (req, res) {
         try {
             const {id} = req.params;
-            const {nameEn, nameRu, nameTr} = req.body;
+            const {nameEn, nameRu, nameTr, nameTm} = req.body;
             const transportType = await TransportType.findOne({where: {uuid: id}});
             if (!transportType) {
                 return res.status(404).json({message: "Transport type not found"});
@@ -26,6 +26,7 @@ class TransportTypeController {
             transportType.nameEn = nameEn;
             transportType.nameRu = nameRu;
             transportType.nameTr = nameTr;
+            transportType.nameTm = nameTm;
             await transportType.save();
             res.status(200).json({message: "Transport type edited successfully", transportType});
         } catch (error) {

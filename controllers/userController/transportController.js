@@ -1,16 +1,55 @@
-const { User, Transport, TransportType, country, city, Cargo, Notifications } = require("../../models/models");
+const { User, Transport, TransportType, country, city, Cargo, Notifications , TransportationType, TruckBody} = require("../../models/models");
 const { Op, Sequelize } = require("sequelize");
 const sendNotification = require("../adminInitialize");
 
 class transportController {
+
+    async getTransportationType(req, res) {
+        try {
+            const { lang } = req.params;
+            const attributes = {
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']],
+            };
+            const types = await TransportationType.findAll({
+                attributes: attributes[lang] || {}
+            });
+            console.log(types)
+            if (!types || types.length === 0) {
+                return res.status(404).json({ message: "Not found" })
+
+            }
+            res.status(200).json({ types });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: "Error in getting transport types" });
+        }
+    }
+
+    async getTruckBody(req, res) {
+        try {
+            const {id} = req.params;
+            let data = await TruckBody.findAll({where: {transportTypeId: id}});
+            if (data.length === 0) {
+                data = []
+            }
+            res.status(200).json({data})
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: "Error in getting transport types" });
+        }
+    }
+
     async getTransportTypes(req, res) {
         try {
             const { lang } = req.params;
-            console.log(lang);
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']],
             };
             const types = await TransportType.findAll({
                 attributes: attributes[lang] || {}
@@ -29,9 +68,9 @@ class transportController {
 
 
     async addTransport(req, res) {
-        async function sendNotificationsAfterResponse(tokens, uuid, type) {
+        async function sendNotificationsAfterResponse(tokens, uuid, type, locationCountry) {
             const notificationPromises = tokens.map((token) =>
-                sendNotification(token, `transport/${uuid}`, 'New transport added', `${uuid}`, type)
+                sendNotification(token, 'New transport added', locationCountry, `${uuid}`, type, locationCountry)
             );
 
             try {
@@ -45,10 +84,13 @@ class transportController {
             const { lang } = req.params;
             const {
                 typeId,
-                belongsTo,
                 locationCountry,
                 locationCity,
+                transportationType,
+                weight,
+                volume,
                 name,
+                truckBodyId,
                 phoneNumber,
                 email,
                 desiredDirection,
@@ -68,18 +110,22 @@ class transportController {
             }
             const userId = req.user.id;
             const newTransport = await Transport.create({
-                belongsTo,
                 locationCountry,
                 locationCity,
                 desiredDirection: desiredDirection,
                 typeId: typeId,
                 whatsApp,
+                transportationTypeId: transportationType,
+                weight,
+                volume,
+                truckBodyId,
                 email,
                 phoneNumber,
                 name,
                 userId: userId,
                 additional_info
             });
+            const locationCountryName = await country.findOne({where: {id: locationCountry}})
             const cargos = await Cargo.findAll({ where: { fromCountry: locationCountry, userId: { [Op.ne]: userId } } })
             const notificationTokens = [];
             const userIds = []
@@ -110,7 +156,7 @@ class transportController {
                     type: 'transport'
                 })
                 console.log("new notification:", notification);
-                await sendNotificationsAfterResponse(notificationTokens, `${newTransport.uuid}`, "transport");
+                await sendNotificationsAfterResponse(notificationTokens, `${newTransport.uuid}`, "transport", locationCountryName.nameEn);
             } catch (error) {
                 console.error(error);
             }
@@ -124,20 +170,22 @@ class transportController {
         try {
             const { lang } = req.params;
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']]
             };
             const page = req.query.page || 1;
             const pageSize = req.query.pageSize || 12;
 
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';
-            const sortOrder = req.query.order || 'ASC';
+            const sortOrder = req.query.order || 'DESC';
             const filters = {
                 typeId: req.query.type,
                 locationCountry: req.query.location,
-                belongsTo: req.query.country,
+                transportationTypeId: req.query.transportation,
+                truckBodyId: req.body.truckbody,
                 userId: {
                     [Op.ne]: req.user.id
                 }
@@ -157,6 +205,9 @@ class transportController {
                 limit: parseInt(pageSize),
                 where: filters,
                 order: [[sort, sortOrder]],
+                attributes: {
+                    exclude: ['updatedAt', 'userId', 'typeId', 'belongsTo', 'locationCountry', 'locationCity']
+                },
                 include: [
                     {
                         model: User,
@@ -183,6 +234,11 @@ class transportController {
                         as: "location_city",
                         attributes: attributes[lang]
                     },
+                    {
+                        model: TransportationType,
+                        as: 'transportationType',
+                        attributes: attributes[lang]
+                    }
                 ]
             });
             for (const single of transports) {
@@ -202,6 +258,7 @@ class transportController {
                 }
                 single.desiredDirection = desiredDirectionCountries;
             }
+            
             if (transports.length === 0) {
                 transports = []
                 return res.status(200).json({ transports });
@@ -223,9 +280,10 @@ class transportController {
         try {
             const { lang } = req.params;
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']]
             };
             const page = req.query.page || 1;
             const pageSize = req.query.pageSize || 12;
@@ -242,6 +300,9 @@ class transportController {
                 limit: parseInt(pageSize),
                 order: [[sort, sortOrder]],
                 where: { userId: id },
+                attributes: {
+                    exclude: ['updatedAt', 'userId', 'typeId', 'belongsTo', 'locationCountry', 'locationCity']
+                },
                 include: [
                     {
                         model: TransportType,
@@ -263,6 +324,11 @@ class transportController {
                         as: "location_city",
                         attributes: attributes[lang]
                     },
+                    {
+                        model: TransportationType,
+                        as: 'transportationType',
+                        attributes: attributes[lang]
+                    }
                 ]
             });
             for (const single of transports) {
@@ -302,9 +368,10 @@ class transportController {
             console.log(req.params);
             const { id, lang } = req.params;
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']]
             };
             const transport = await Transport.findOne({
                 where: { uuid: id },
@@ -334,6 +401,11 @@ class transportController {
                         as: "location_city",
                         attributes: attributes[lang]
                     },
+                    {
+                        model: TransportationType,
+                        as: 'transportationType',
+                        attributes: attributes[lang]
+                    }
 
                 ]
             });
@@ -345,8 +417,24 @@ class transportController {
                 } if (lang === "tr") {
                     return res.status(404).json({ message: "Transport not found" });
                 }
-
             }
+
+            const desiredDirectionCountries = [];
+                for (const directionId of transport.desiredDirection) {
+                    const directionCountry = await country.findByPk(directionId);
+                    if (directionCountry) {
+                        if (lang === "en") {
+                            desiredDirectionCountries.push(directionCountry.nameEn);
+                        } else if (lang === "ru") {
+                            desiredDirectionCountries.push(directionCountry.nameRu);
+                        } else {
+                            desiredDirectionCountries.push(directionCountry.nameTr);
+                        }
+
+                    }
+                }
+                transport.desiredDirection = desiredDirectionCountries;
+
 
             res.status(200).json({ transport });
         } catch (error) {

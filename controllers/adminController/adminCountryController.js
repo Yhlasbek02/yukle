@@ -4,12 +4,12 @@ const {Op} = require("sequelize");
 class CountryController {
     async addCountry (req, res) {
         try {
-            const {nameEn, nameRu, nameTr} = req.body;
+            const {nameEn, nameRu, nameTr, nameTm} = req.body;
             const countryData = await country.findOne({where: {nameEn: nameEn}});
             if (countryData) {
                 return res.status(404).json({message: "Country already exist"});
             }
-            const newCountry = await country.create({nameEn, nameRu, nameTr});
+            const newCountry = await country.create({nameEn, nameRu, nameTr, nameTm});
             res.status(200).json({message: "Country added", newCountry});
         } catch (error) {
             console.error(error);
@@ -75,7 +75,7 @@ class CountryController {
     async editCountry (req, res) {
         try {
             const {id} = req.params;
-            const {nameEn, nameRu, nameTr} = req.body;
+            const {nameEn, nameRu, nameTr, nameTm} = req.body;
             const countryData = await country.findOne({where: {uuid: id}});
             if (!countryData) {
                 return res.status(404).json({message: "Country not found"});
@@ -83,6 +83,7 @@ class CountryController {
             countryData.nameEn = nameEn;
             countryData.nameRu = nameRu;
             countryData.nameTr = nameTr;
+            countryData.nameTm = nameTm;
             await countryData.save();
             res.status(200).json({message: "Country edited successfully"});
         } catch (error) {
@@ -154,10 +155,10 @@ class CountryController {
 
     async addCity (req, res) {
         try {
-            const {nameEn, nameRu, nameTr, countryId} = req.body;
+            const {nameEn, nameRu, nameTr, nameTm, countryId} = req.body;
             console.log(req.body);
             const newCity = await city.create({
-                nameEn, nameRu, nameTr, countryId
+                nameEn, nameRu, nameTr, nameTm, countryId
             });
             
             res.status(200).json({message: 'City successfully added', newCity});
@@ -170,7 +171,7 @@ class CountryController {
     async editCity (req, res) {
         try {
             const {id} = req.params;
-            const {nameEn, nameRu, nameTr, countryId} = req.body;
+            const {nameEn, nameRu, nameTr, nameTm, countryId} = req.body;
             const City = await city.findOne({where: {uuid: id}});
             if (!City) {
                 return res.status(404).json({message: "Not found"});
@@ -178,6 +179,7 @@ class CountryController {
             City.nameEn = nameEn;
             City.nameRu = nameRu;
             City.nameTr = nameTr;
+            City.nameTm = nameTm;
             City.countryId = countryId;
             await City.save();
             res.status(200).json({message: "City updated", city});

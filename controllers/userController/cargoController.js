@@ -1,14 +1,44 @@
-const { User, Cargo, CargoType, TransportType, country, city, Transport, Notifications } = require("../../models/models");
+const { User, Cargo, CargoType, TransportType, country, city, Transport, Notifications, DangerousType } = require("../../models/models");
 const { Op, Sequelize } = require("sequelize");
 const sendNotification = require("../adminInitialize");
 class CargoController {
+
+    async getDangerousTypes(req, res) {
+        try {
+            const { lang } = req.params;
+            const attributes = {
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']],
+            };
+            const types = await DangerousType.findAll({
+                attributes: attributes[lang] || {}
+            });
+            if (!types || types.length === 0) {
+                if (lang === "en") {
+                    return res.status(404).json({ message: "Cargo types not found" });
+                } if (lang === "ru") {
+                    return res.status(404).json({ message: "Cargo types not found" });
+                } if (lang === "tr") {
+                    return res.status(404).json({ message: "Cargo types not found" });
+                }
+            }
+            res.status(200).json({ types });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: "Error in getting dangerous types" });
+        }
+    }
+
     async getCargoTypes(req, res) {
         try {
             const { lang } = req.params;
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']],
             };
             const types = await CargoType.findAll({
                 attributes: attributes[lang] || {}
@@ -29,15 +59,15 @@ class CargoController {
         }
     }
 
-    
-    
+
+
 
     async addCargo(req, res) {
-        async function sendNotificationsAfterResponse(tokens, uuid, type) {
+        async function sendNotificationsAfterResponse(tokens, uuid, type, locationCountry) {
             const notificationPromises = tokens.map((token) =>
-                sendNotification(token, `cargo/${uuid}`, 'New cargo added', `${uuid}`, type)
+                sendNotification(token, `New cargo added`, locationCountry, `${uuid}`, type, locationCountry)
             );
-        
+
             try {
                 await Promise.all(notificationPromises);
                 console.log("Notifications sent successfully");
@@ -49,6 +79,12 @@ class CargoController {
             const { lang } = req.params;
             const {
                 typeId,
+                cargoName,
+                dangerousTypes,
+                volume,
+                price,
+                tradeable,
+                departureDate,
                 fromCountry,
                 fromCity,
                 toCountry,
@@ -61,7 +97,7 @@ class CargoController {
                 whatsApp,
                 additional_info
             } = req.body;
-            
+
             if (!typeId || !fromCity || !fromCountry || !toCountry || !toCity || !weight || !name) {
                 if (!phoneNumber && !email) {
                     if (lang === "en") {
@@ -80,6 +116,12 @@ class CargoController {
                 fromCity: fromCity,
                 toCountry: toCountry,
                 toCity: toCity,
+                cargoName,
+                dangerousTypes,
+                volume,
+                price,
+                tradeable,
+                departureDate,
                 typeTransport,
                 weight,
                 phoneNumber,
@@ -91,12 +133,11 @@ class CargoController {
             });
             console.log(req.body);
             const transports = await Transport.findAll({ where: { locationCountry: fromCountry, userId: { [Op.ne]: userId } } });
-            console.log("transports:", transports);
             const notificationTokens = [];
             const userIds = []
 
             for (const transport of transports) {
-                const user = await User.findOne({ where: { id: transport.userId }});
+                const user = await User.findOne({ where: { id: transport.userId } });
                 console.log("user:", user.dataValues);
                 if (user.fcm_token && user.cargoNotification && !notificationTokens.includes(user.fcm_token)) {
                     userIds.push(user.id);
@@ -107,6 +148,11 @@ class CargoController {
                     console.log(`${user.email} has no fcm_token`);
                 }
             }
+
+            const fromCountryName = await country.findOne({ where: { id: fromCountry } });
+            if (!fromCountryName) {
+                return res.status(404).json({ message: "Not found" });
+            }
             if (lang === "en") {
                 res.status(200).json({ message: "Cargo added successfully", newCargo });
             } else if (lang === "ru") {
@@ -115,19 +161,17 @@ class CargoController {
                 res.status(200).json({ message: "Yük başarıyla eklendi", newCargo });
             }
             try {
-                console.log("this is notification part");
                 const notification = await Notifications.create({
                     userIds: userIds,
                     body: "New Cargo",
                     url: `cargo/${newCargo.uuid}`,
                     type: 'cargo'
                 })
-                console.log("new notification:", notification);
-                await sendNotificationsAfterResponse(notificationTokens, `${newCargo.uuid}`, "cargo");    
+                await sendNotificationsAfterResponse(notificationTokens, `${newCargo.uuid}`, "cargo", fromCountryName.nameEn);
             } catch (error) {
                 console.error(error);
             }
-            
+
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Cargo adding error" })
@@ -142,30 +186,43 @@ class CargoController {
 
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const sort = req.query.sort || 'createdAt';
-            const sortOrder = req.query.order || 'ASC';
+            const sortOrder = req.query.order || 'DESC';
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']],
             };
             const filters = {
-
                 typeId: req.query.type,
                 fromCountry: req.query.from,
                 toCountry: req.query.to,
-                weight: { [Op.lte]: parseInt(req.query.weight) }
+                weight: req.query.weight && !isNaN(parseInt(req.query.weight)) ? { [Op.lte]: parseInt(req.query.weight) } : undefined,
             };
 
+            if (req.query.departureDate) {
+                const [day, month, year] = req.query.departureDate.split('.').map(Number);
+                if (day && month && year) {
+                    const startOfDay = new Date(year, month - 1, day, 0, 0, 0); // Start of the given day
+                    const endOfDay = new Date(year, month - 1, day, 23, 59, 59); // End of the given day
+                    filters.departureDate = { [Op.between]: [startOfDay, endOfDay] };
+                }
+            }
+
+            // Remove undefined or empty filters
             Object.keys(filters).forEach((key) => {
                 if (filters[key] === undefined || filters[key] === "") {
                     delete filters[key];
                 }
             });
-            const totalCount = await Cargo.count({where: {
-                ...filters,
-                userId: {
-                    [Op.ne]: req.user.id
-                }}
+
+            const totalCount = await Cargo.count({
+                where: {
+                    ...filters,
+                    userId: {
+                        [Op.ne]: req.user.id
+                    }
+                }
             });
             let cargos = await Cargo.findAll({
                 offset,
@@ -175,6 +232,9 @@ class CargoController {
                     userId: {
                         [Op.ne]: req.user.id
                     }
+                },
+                attributes: {
+                    exclude: ['updatedAt', 'userId', 'typeId', 'fromCountry', 'fromCity', 'toCountry', 'toCity']
                 },
                 order: [[sort, sortOrder]],
                 include: [
@@ -225,6 +285,15 @@ class CargoController {
                     }
                 }
                 single.typeTransport = transportTypes;
+
+                let dangerousTypes = [];
+                for (const dangerousTypeId of single.dangerousTypes || []) {
+                    const dangerousType = await DangerousType.findOne({ id: dangerousTypeId });
+                    if (dangerousType) {
+                        dangerousTypes.push(dangerousType[`name${lang.charAt(0).toUpperCase() + lang.slice(1)}`]);
+                    }
+                }
+                single.dangerousTypes = dangerousTypes;
             }
 
             if (cargos.length === 0) {
@@ -261,18 +330,22 @@ class CargoController {
             const sortOrder = req.query.order || 'ASC';
             const userId = req.user.id;
             const totalCount = await Cargo.count({
-                where: {userId: userId}
+                where: { userId: userId }
             });
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']],
             };
             let cargos = await Cargo.findAll({
                 offset,
                 limit: parseInt(pageSize),
                 order: [[sort, sortOrder]],
                 where: { userId: userId },
+                attributes: {
+                    exclude: ['updatedAt', 'userId', 'typeId', 'fromCountry', 'fromCity', 'toCountry', 'toCity']
+                },
                 include: [
                     {
                         model: CargoType,
@@ -301,7 +374,6 @@ class CargoController {
                     }
                 ]
             });
-            console.log(cargos);
             for (const single of cargos) {
                 const transportTypes = [];
                 for (const typeId of single.typeTransport) {
@@ -314,9 +386,20 @@ class CargoController {
                         } if (lang === "tr") {
                             transportTypes.push(type.nameTr);
                         }
+                        if (lang === "tm") {
+                            transportTypes.push(type.nameTm);
+                        }
                     }
                 }
                 single.typeTransport = transportTypes;
+                let dangerousTypes = [];
+                for (const dangerousTypeId of single.dangerousTypes || []) {
+                    const dangerousType = await DangerousType.findByPk(dangerousTypeId);
+                    if (dangerousType) {
+                        dangerousTypes.push(dangerousType[`name${lang.charAt(0).toUpperCase() + lang.slice(1)}`]);
+                    }
+                }
+                single.dangerousTypes = dangerousTypes;
             }
             if (cargos.length === 0) {
                 cargos = []
@@ -341,9 +424,10 @@ class CargoController {
             const { id, lang } = req.params;
             console.log(id);
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
+                tm: ['id', 'uuid', [Sequelize.col('nameTm'), 'name']],
             };
             const cargo = await Cargo.findOne({
                 where: { uuid: id },
@@ -380,7 +464,9 @@ class CargoController {
                     }
                 ]
             });
-            console.log(cargo.dataValues)
+
+
+
             if (!cargo) {
                 if (lang === "en") {
                     return res.status(404).json({ message: "Cargo not found" });
@@ -390,6 +476,32 @@ class CargoController {
                     return res.status(404).json({ message: "Cargos not found" });
                 }
             }
+            let transportTypes = [];
+            for (const typeId of cargo.typeTransport) {
+
+                const type = await TransportType.findByPk(typeId);
+                if (type) {
+                    if (lang === "en") {
+                        transportTypes.push(type.nameEn);
+                    } if (lang === "ru") {
+                        transportTypes.push(type.nameRu);
+                    } if (lang === "tr") {
+                        transportTypes.push(type.nameTr);
+                    }
+                }
+
+
+            }
+            cargo.typeTransport = transportTypes;
+
+            let dangerousTypes = [];
+            for (const dangerousTypeId of cargo.dangerousTypes || []) {
+                const dangerousType = await DangerousType.findOne({ id: dangerousTypeId });
+                if (dangerousType) {
+                    dangerousTypes.push(dangerousType[`name${lang.charAt(0).toUpperCase() + lang.slice(1)}`]);
+                }
+            }
+            cargo.dangerousTypes = dangerousTypes;
             res.status(200).json({ cargo });
         } catch (error) {
             console.error(error);

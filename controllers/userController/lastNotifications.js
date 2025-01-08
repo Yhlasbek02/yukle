@@ -25,84 +25,66 @@ class notificationController {
                 limit: parseInt(pageSize),
                 offset
             });
-            const data = []
 
-            // Fetch cargo or transport information for each notification
-            for (const notification of notifications) {
-                const attributes = {
-                    en: [[Sequelize.col('nameEn'), 'name']],
-                    ru: [[Sequelize.col('nameRu'), 'name']],
-                    tr: [[Sequelize.col('nameTr'), 'name']],
-                };
-                const uuid = notification.url.split('/')[1];
-                const entityType = notification.url.split('/')[0]; // Extracting whether it's cargo or transport
-                let entityInfo;
+            const attributes = {
+                en: [[Sequelize.col('nameEn'), 'name']], // Only the 'name' column in English
+                ru: [[Sequelize.col('nameRu'), 'name']], // Only the 'name' column in Russian
+                tr: [[Sequelize.col('nameTr'), 'name']],
+                tm: [[Sequelize.col('nameTm'), 'name']]
+            };
 
-                if (entityType === 'cargo') {
-                    entityInfo = await Cargo.findOne({
-                        where: { uuid },
-                        include: [
-                            {
-                                model: CargoType,
-                                as: "type",
-                                attributes: attributes[lang]
-                            },
-                            {
-                                model: country,
-                                as: "from_country",
-                                attributes: attributes[lang]
-                            },
-                            {
-                                model: country,
-                                as: "to_country",
-                                attributes: attributes[lang]
-                            },
-                            {
-                                model: city,
-                                as: "from_city",
-                                attributes: attributes[lang]
-                            },
-                            {
-                                model: city,
-                                as: "to_city",
-                                attributes: attributes[lang]
-                            }
+            const data = await Promise.all(
+                notifications.map(async (notification) => {
+                    const uuid = notification.url?.split('/')[1];
+                    const entityType = notification.url?.split('/')[0];
+                    let entityInfo;
 
-                        ]
-                    });
-                } else if (entityType === 'transport') {
-                    entityInfo = await Transport.findOne({
-                        where: { uuid },
-                        include: [
-                            {
-                                model: TransportType,
-                                as: "type",
-                                attributes: attributes[lang]
-                            },
-                            {
-                                model: country,
-                                as: "affiliation_country",
-                                attributes: attributes[lang]
-                            },
-                            {
-                                model: country,
-                                as: "location_country",
-                                attributes: attributes[lang]
-                            },
-                            {
-                                model: city,
-                                as: "location_city",
-                                attributes: attributes[lang]
-                            },
-                        ]
-                    });
-                }
+                    // Add applicationType based on notification body
+                    let applicationType = null;
+                    if (notification.body === "New Cargo") {
+                        applicationType = "cargo";
+                    } else if (notification.body === "New Transport") {
+                        applicationType = "transport";
+                    }
 
-                // If entityInfo is not null, serialize it before assigning
-                notification.dataValues.extraInfo = entityInfo ? entityInfo.toJSON() : null;
-                console.log(notification);
-                data.push(notification)
-            }
+                    if (entityType === 'cargo') {
+                        entityInfo = await Cargo.findOne({
+                            where: { uuid },
+                            attributes: ['uuid', 'phoneNumber', 'email', 'name'],
+                            include: [
+                                {
+                                    model: CargoType,
+                                    as: "type",
+                                    attributes: attributes[lang]
+                                }
+                            ]
+                        });
+                    } else if (entityType === 'transport') {
+                        entityInfo = await Transport.findOne({
+                            where: { uuid },
+                            attributes: ['email', 'phoneNumber', 'name', 'uuid'],
+                            include: [
+                                {
+                                    model: TransportType,
+                                    as: "type",
+                                    attributes: attributes[lang]
+                                }
+                            ]
+                        });
+                    }
+
+                    // Merge entityInfo directly into the notification object
+                    if (entityInfo) {
+                        const entityData = entityInfo.toJSON(); // Serialize entityInfo to a plain object
+                        Object.assign(notification.dataValues, entityData); // Merge entityData fields into notification
+                    }
+
+                    // Add applicationType to the notification object
+                    notification.dataValues.applicationType = applicationType;
+
+                    return notification;
+                })
+            );
 
             const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -113,6 +95,8 @@ class notificationController {
         }
     }
 
+
+
     async getWebNotifications(req, res) {
         try {
             const { lang } = req.params;
@@ -120,9 +104,9 @@ class notificationController {
             const user = await User.findOne({ where: { id: req.user.id } });
             const offset = (parseInt(page) - 1) * parseInt(pageSize);
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
             };
             const whereClause = {
                 userIds: {

@@ -25,9 +25,9 @@ class countryController {
 
 
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
             };
 
             const countries = await country.findAll({
@@ -83,9 +83,9 @@ class countryController {
             }
 
             const attributes = {
-                en: [[Sequelize.col('nameEn'), 'name']],
-                ru: [[Sequelize.col('nameRu'), 'name']],
-                tr: [[Sequelize.col('nameTr'), 'name']],
+                en: ['id', 'uuid', [Sequelize.col('nameEn'), 'name']],
+                ru: ['id', 'uuid', [Sequelize.col('nameRu'), 'name']],
+                tr: ['id', 'uuid', [Sequelize.col('nameTr'), 'name']],
             };
 
             let cities = await city.findAll({ where: whereClauses, attributes: attributes[lang] || {} });

@@ -36,6 +36,9 @@ class ChatController {
             const id = req.user.id;
             let messages = await Message.findAll({
                 where: { senderId: id },
+                order: [
+                    ['id', 'ASC']
+                ],
                 include: [
                     {
                         model: adminMessage,

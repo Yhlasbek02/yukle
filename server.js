@@ -1,15 +1,15 @@
 const express = require("express");
-const {exec} = require("child_process");
+const { exec } = require("child_process");
 const dotenv = require("dotenv");
 const sequelize = require('./config/config');
 const http = require("http");
 const path = require("path");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-// const {Op} = require("sequelize");
+const { Op } = require("sequelize");
 const routes = require("./routes/allRoutes");
 const country = require("./controllers/countryController");
-const {verificationCodes, User} = require("./models/models");
+const { verificationCodes, User } = require("./models/models");
 dotenv.config();
 const app = express();
 const server = http.createServer(app);
@@ -26,7 +26,7 @@ app.use("/", express.static(path.join(__dirname, "build")));
 app.use("/api", routes);
 app.use("/", country);
 app.all("*", (req, res, next) => {
-  return res.status(404).json({message: `Can't find ${req.originalUrl} on this server`});
+  return res.status(404).json({ message: `Can't find ${req.originalUrl} on this server` });
 });
 
 const backupDatabase = () => {
@@ -51,37 +51,51 @@ const backupDatabase = () => {
 };
 
 
-// async function deleteExpriredUsers() {
-//   const current_time = Date.now();
-//   try {
-//     const codes = await verificationCodes.findAll({where: {expireTime: {[Op.lte]: current_time}}})
-//     const userEmails = codes.map(code => code.emailOrNumber);
-//     const users = await User.findAll({
-//       where: {
-//         email: {
-//           [Op.in]: userEmails
-//         }
-//       }
-//     });
-//     for (const code of codes) {
-//       await code.destroy();
-//     }
-//     for (const user of users) {
-//       await user.destroy();
-//     }
-//     console.log(`${users.length} user and ${codes.length} code are removed from database`);
-//   } catch (error) {
-//     console.log(error);
-//   }
-// }
+async function deleteExpiredUsers() {
+  const current_time = Date.now();
+  try {
+    const expiredCodes = await verificationCodes.findAll({
+      where: { expireTime: { [Op.lte]: current_time } },
+    });
+    const expiredEmailsOrNumbers = expiredCodes.map((code) => code.emailOrNumber);
+    const usersToDelete = await User.findAll({
+      where: {
+        verified: false,
+        [Op.or]: [
+          { email: { [Op.in]: expiredEmailsOrNumbers } },
+          { phoneNumber: { [Op.in]: expiredEmailsOrNumbers } },
+        ],
+      },
+    });
 
-// setInterval(deleteExpriredUsers, 3 * 60 * 1000);
+    for (const code of expiredCodes) {
+      console.log(`Deleting code: ${code.dataValues.code}`);
+      await code.destroy();
+    }
+    for (const user of usersToDelete) {
+      console.log(`Deleting user: ${user.dataValues.name} (${user.dataValues.email || user.dataValues.phoneNumber})`);
+      await user.destroy();
+    }
+
+    console.log(
+      `${usersToDelete.length} unverified users and ${expiredCodes.length} verification codes removed from the database`
+    );
+  } catch (error) {
+    console.error('Error deleting expired users or codes:', error);
+  }
+}
+
+// Run the function at regular intervals
+setInterval(deleteExpiredUsers, 5 * 60 * 1000);
+
+
+const { Cargo, Transport, TransportationType, Chat, ChatMessage } = require("./models/models")
 
 const start = async () => {
   try {
     // backupDatabase();
     await sequelize.authenticate();
-    await sequelize.sync({alter:true});
+    // await sequelize.sync({alter:true});
     server.listen(PORT, () => console.log(`server started on port ${PORT}`));
   } catch (error) {
     console.error(error);
